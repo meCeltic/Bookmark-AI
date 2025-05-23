@@ -138,9 +138,4 @@ I spent approximately 20 hours on this project, distributed as follows:
 ### Tag Management
 ![Tag Management](public/screenshots/tag-management.png)
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-\`\`\`
-
 <!-- ## 3. Let's create a screenshots directory and add instructions for visual documentation: -->
