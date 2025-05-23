@@ -2,7 +2,7 @@
 
 BookmarkAI is a full-stack web application that allows users to save, organize, and automatically summarize their bookmarks. The application extracts metadata from bookmarked websites and uses Jina AI to generate summaries.
 
-![BookmarkAI Dashboard](public/bookmark-app-ai-dashboard.png)
+![BookmarkAI Dashboard](public/screenshots/bookmark-app-ai-dashboard.png)
 
 ## Features
 
@@ -47,7 +47,7 @@ BookmarkAI is a full-stack web application that allows users to save, organize, 
 
 1. Clone the repository:
    \`\`\`bash
-   git clone https://github.com/yourusername/bookmark-ai.git
+   git clone https://github.com/meCeltic/Bookmark-AI
    cd bookmark-ai
    \`\`\`
 
@@ -118,11 +118,11 @@ Given more time, I would implement the following features and improvements:
 I spent approximately 20 hours on this project, distributed as follows:
 
 - **Planning and Research**: 2 hours
-- **Setting up the project and authentication**: 3 hours
-- **Implementing bookmark creation and metadata extraction**: 5 hours
-- **Building the UI and implementing features**: 7 hours
-- **Testing and debugging**: 2 hours
-- **Documentation**: 1 hour
+- **Setting up the project and authentication**: 1.5 hours
+- **Implementing bookmark creation and metadata extraction**: 1 hours
+- **Building the UI and implementing features**: 1 hours
+- **Testing and debugging**: 1 hours
+- **Documentation**: 0.5 hours
 
 ## Screenshots
 
