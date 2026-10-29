@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 import { useDashboard } from "./provider"
 import { Sidebar } from "./sidebar"
@@ -46,15 +47,16 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
     <div className="flex h-dvh overflow-hidden">
       <Sidebar className="hidden lg:flex" userLabel={userLabel} onImport={() => setImporting(true)} onExport={() => setExporting(true)} onSignOut={onSignOut} />
 
-      {drawer ? (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 bg-ink/30" onClick={() => setDrawer(false)} />
-          <div className="absolute inset-y-0 left-0 flex">
+      <DialogPrimitive.Root open={drawer} onOpenChange={setDrawer}>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-ink/30 lg:hidden" />
+          <DialogPrimitive.Content className="fixed inset-y-0 left-0 z-50 flex outline-none lg:hidden">
+            <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
             <Sidebar userLabel={userLabel} onImport={() => { setDrawer(false); setImporting(true) }} onExport={() => { setDrawer(false); setExporting(true) }} onSignOut={onSignOut} onNavigate={() => setDrawer(false)} />
-            <button type="button" className="btn btn-icon m-2 h-9 w-9 self-start" aria-label="Close menu" onClick={() => setDrawer(false)}><X size={16} /></button>
-          </div>
-        </div>
-      ) : null}
+            <DialogPrimitive.Close className="btn btn-icon m-2 h-9 w-9 self-start" aria-label="Close menu"><X size={16} /></DialogPrimitive.Close>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onOpenPalette={() => setPalette(true)} onOpenMenu={() => setDrawer(true)} />

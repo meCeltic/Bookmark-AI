@@ -21,6 +21,12 @@ type Row = Record<string, unknown>
 
 const UNIQUE_VIOLATION = "23505"
 
+/** Postgres wording and constraint names stay in the server log; the client gets one sentence. */
+function failInternal<T>(error: { message: string; code?: string }): Result<T> {
+  console.error("[supabase]", error.code ?? "", error.message)
+  return fail("INTERNAL", "Something went wrong saving that. Please try again.")
+}
+
 function rowToBookmark(row: Row): Bookmark {
   return bookmarkSchema.parse({
     id: row.id,
@@ -147,7 +153,7 @@ export class SupabaseRepository implements BookmarkRepository {
         savedAt: existing?.created_at,
       })
     }
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     return ok(rowToBookmark(data as Row))
   }
 
@@ -158,16 +164,30 @@ export class SupabaseRepository implements BookmarkRepository {
       .eq("id", id)
       .select("*")
       .maybeSingle()
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     if (!data) return fail("NOT_FOUND", "That bookmark is gone.")
     return ok(rowToBookmark(data as Row))
   }
 
   async deleteBookmark(id: string): Promise<Result<void>> {
     const { data, error } = await this.db.from("bookmarks").delete().eq("id", id).select("id")
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     if (!data?.length) return fail("NOT_FOUND", "That bookmark is gone.")
     return ok(undefined)
+  }
+
+  async updateBookmarks(ids: string[], patch: BookmarkPatch): Promise<Result<Bookmark[]>> {
+    if (!ids.length) return ok([])
+    const { data, error } = await this.db.from("bookmarks").update(patchToRow(patch)).in("id", ids).select("*")
+    if (error) return failInternal(error)
+    return ok((data as Row[]).map(rowToBookmark))
+  }
+
+  async deleteBookmarks(ids: string[]): Promise<Result<{ deleted: number }>> {
+    if (!ids.length) return ok({ deleted: 0 })
+    const { data, error } = await this.db.from("bookmarks").delete().in("id", ids).select("id")
+    if (error) return failInternal(error)
+    return ok({ deleted: data?.length ?? 0 })
   }
 
   async importBookmarks(inputs: NewBookmark[]): Promise<Result<{ created: Bookmark[]; skipped: number }>> {
@@ -182,7 +202,7 @@ export class SupabaseRepository implements BookmarkRepository {
       .from("bookmarks")
       .upsert(rows, { onConflict: "user_id,url_normalized", ignoreDuplicates: true })
       .select("*")
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     const created = (data as Row[]).map(rowToBookmark)
     return ok({ created, skipped: inputs.length - created.length })
   }
@@ -196,14 +216,14 @@ export class SupabaseRepository implements BookmarkRepository {
   async createCollection(name: string): Promise<Result<Collection>> {
     const clean = name.trim()
     if (!clean) return fail("VALIDATION", "Give the collection a name.")
-    const { count } = await this.db.from("collections").select("id", { count: "exact", head: true })
+    const { data: last } = await this.db.from("collections").select("position").order("position", { ascending: false }).limit(1).maybeSingle()
     const { data, error } = await this.db
       .from("collections")
-      .insert({ user_id: this.userId, name: clean, position: count ?? 0 })
+      .insert({ user_id: this.userId, name: clean, position: ((last as Row | null)?.position as number | undefined ?? -1) + 1 })
       .select("*")
       .single()
     if (error?.code === UNIQUE_VIOLATION) return fail("DUPLICATE", `"${clean}" already exists.`)
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     return ok(rowToCollection(data as Row))
   }
 
@@ -217,14 +237,14 @@ export class SupabaseRepository implements BookmarkRepository {
       .select("*")
       .maybeSingle()
     if (error?.code === UNIQUE_VIOLATION) return fail("DUPLICATE", `"${clean}" already exists.`)
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     if (!data) return fail("NOT_FOUND", "That collection is gone.")
     return ok(rowToCollection(data as Row))
   }
 
   async deleteCollection(id: string): Promise<Result<void>> {
     const { data, error } = await this.db.from("collections").delete().eq("id", id).select("id")
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     if (!data?.length) return fail("NOT_FOUND", "That collection is gone.")
     return ok(undefined)
   }
@@ -234,7 +254,7 @@ export class SupabaseRepository implements BookmarkRepository {
       from_tag: from.trim().toLowerCase(),
       to_tag: to.trim().toLowerCase(),
     })
-    if (error) return fail("INTERNAL", error.message)
+    if (error) return failInternal(error)
     return ok({ affected: Number(data ?? 0) })
   }
 
@@ -249,6 +269,6 @@ export class SupabaseRepository implements BookmarkRepository {
     const b = await this.db.from("bookmarks").delete().eq("user_id", this.userId)
     const c = await this.db.from("collections").delete().eq("user_id", this.userId)
     const error = b.error ?? c.error
-    return error ? fail("INTERNAL", error.message) : ok(undefined)
+    return error ? failInternal(error) : ok(undefined)
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import type { LinkHealth } from "@/lib/domain/bookmark"
+import { errorResponse, readJsonBody } from "@/lib/http"
 import { clientKey, limiterFor } from "@/lib/ratelimit"
 import { getSessionUser } from "@/lib/supabase/server"
 import { safeFetch } from "@/lib/url/ssrf-guard"
@@ -20,16 +21,14 @@ export async function POST(request: Request) {
   const limiter = limiterFor("health", { capacity: 10, windowMs: 60_000 })
   const verdict = limiter.take(clientKey(request.headers, user?.id))
   if (!verdict.allowed) {
-    return NextResponse.json(
-      { error: { code: "RATE_LIMITED", message: "Checked a lot of links recently. Try again in a minute." } },
-      { status: 429, headers: { "Retry-After": String(verdict.retryAfterSeconds) } },
+    return errorResponse(
+      { code: "RATE_LIMITED", message: "Checked a lot of links recently. Try again in a minute." },
+      { "Retry-After": String(verdict.retryAfterSeconds) },
     )
   }
 
-  const body = bodySchema.safeParse(await request.json().catch(() => null))
-  if (!body.success) {
-    return NextResponse.json({ error: { code: "VALIDATION", message: "Expected a list of urls." } }, { status: 400 })
-  }
+  const body = bodySchema.safeParse(await readJsonBody(request))
+  if (!body.success) return errorResponse({ code: "VALIDATION", message: "Expected a list of urls." })
 
   const results = await mapWithConcurrency(body.data.urls, CONCURRENCY, checkOne)
   return NextResponse.json({ results }, { headers: { "Cache-Control": "no-store" } })
@@ -40,7 +39,7 @@ async function checkOne(url: string): Promise<{ url: string; health: LinkHealth;
   if (res.ok && (res.data.status === 405 || res.data.status === 403 || res.data.status === 501)) {
     res = await safeFetch(url, { method: "GET", timeoutMs: 6000, maxBytes: 16_384 })
   }
-  if (!res.ok) return { url, health: res.error.code === "BLOCKED_URL" ? "dead" : "dead", status: null }
+  if (!res.ok) return { url, health: "dead", status: null }
   const { status, redirected } = res.data
   if (status >= 400) return { url, health: "dead", status }
   return { url, health: redirected ? "redirected" : "ok", status }

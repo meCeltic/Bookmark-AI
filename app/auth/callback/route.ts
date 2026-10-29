@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { safeNextPath } from "@/lib/url/safe-path"
 
 /** Finishes email confirmation and OAuth flows by exchanging the code for a session. */
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const code = url.searchParams.get("code")
-  const nextPath = url.searchParams.get("next") ?? "/dashboard"
-  const safeNext = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/dashboard"
+  const safeNext = safeNextPath(url.searchParams.get("next"))
 
   if (code) {
     const supabase = await createSupabaseServerClient()

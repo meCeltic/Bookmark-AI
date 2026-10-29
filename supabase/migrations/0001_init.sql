@@ -1,7 +1,8 @@
 -- Bookmark-AI schema. Apply with `supabase db push` or paste into the SQL editor.
 -- One user owns everything; row-level security enforces it for every verb.
 
-create extension if not exists pg_trgm;
+create schema if not exists extensions;
+create extension if not exists pg_trgm with schema extensions;
 
 -- ---------------------------------------------------------------- collections
 create table public.collections (
@@ -54,11 +55,12 @@ create table public.bookmarks (
 create index bookmarks_user_created_idx on public.bookmarks (user_id, created_at desc);
 create index bookmarks_search_idx       on public.bookmarks using gin (search);
 create index bookmarks_tags_idx         on public.bookmarks using gin (tags);
-create index bookmarks_title_trgm_idx   on public.bookmarks using gin (title gin_trgm_ops);
+create index bookmarks_title_trgm_idx   on public.bookmarks using gin (title extensions.gin_trgm_ops);
+create index bookmarks_collection_idx   on public.bookmarks (collection_id);
 
 -- ------------------------------------------------------------------ updated_at
 create or replace function public.touch_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   new.updated_at = now();
   return new;
@@ -86,15 +88,16 @@ create policy "bookmarks: owner only" on public.bookmarks
 create or replace function public.search_bookmarks(q text, max_rows integer default 50)
 returns setof public.bookmarks
 language sql stable
+set search_path = ''
 as $$
-  with query as (select websearch_to_tsquery('english', q) as tsq)
+  with query as (select pg_catalog.websearch_to_tsquery('english', q) as tsq)
   select b.*
   from public.bookmarks b, query
   where b.user_id = auth.uid()
-    and (b.search @@ query.tsq or q <% b.title)
+    and (b.search @@ query.tsq or extensions.word_similarity(q, b.title) >= 0.6)
   order by
-    ts_rank_cd(b.search, query.tsq) desc,
-    word_similarity(q, b.title) desc,
+    pg_catalog.ts_rank_cd(b.search, query.tsq) desc,
+    extensions.word_similarity(q, b.title) desc,
     b.created_at desc
   limit max_rows;
 $$;
@@ -103,13 +106,14 @@ $$;
 create or replace function public.rename_tag(from_tag text, to_tag text)
 returns integer
 language plpgsql
+set search_path = ''
 as $$
 declare affected integer;
 begin
   update public.bookmarks
   set tags = (
-    select coalesce(array_agg(distinct t order by t), '{}')
-    from unnest(array_replace(tags, from_tag, nullif(to_tag, ''))) as t
+    select coalesce(pg_catalog.array_agg(distinct t order by t), '{}')
+    from pg_catalog.unnest(pg_catalog.array_replace(tags, from_tag, nullif(to_tag, ''))) as t
     where t is not null
   )
   where user_id = auth.uid() and from_tag = any (tags);

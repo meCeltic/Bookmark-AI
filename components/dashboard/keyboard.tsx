@@ -35,7 +35,7 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
       }
 
       switch (e.key) {
-        case "j": case "ArrowDown": e.preventDefault(); move(index < 0 ? 1 : 1); break
+        case "j": case "ArrowDown": e.preventDefault(); move(1); break
         case "k": case "ArrowUp": e.preventDefault(); move(-1); break
         case "Enter": if (current) { e.preventDefault(); api.open(current) } break
         case "f": if (current) void api.patch(current.id, { favourite: !current.favourite }); break
@@ -49,7 +49,8 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
           break
         case "g": api.dispatch({ type: "layout", layout: "grid" }); break
         case "l": api.dispatch({ type: "layout", layout: "list" }); break
-        case "a": if (e.shiftKey) { e.preventDefault(); api.dispatch({ type: "select", ids: items.map((b) => b.id), mode: "set" }) } break
+        case "a": case "A": if (e.shiftKey) { e.preventDefault(); api.dispatch({ type: "select", ids: items.map((b) => b.id), mode: "set" }) } break
+        case "t": if (current) window.dispatchEvent(new CustomEvent("bookmark-ai:tag", { detail: current.id })); break
         case "Escape":
           if (api.state.selected.size) api.dispatch({ type: "select", ids: [], mode: "set" })
           else setFocusId(null)

@@ -16,7 +16,6 @@ export interface RateLimitOptions {
 
 export interface RateLimitVerdict {
   allowed: boolean
-  remaining: number
   retryAfterSeconds: number
 }
 
@@ -39,11 +38,11 @@ export class RateLimiter {
     if (bucket.tokens >= 1) {
       bucket.tokens -= 1
       this.buckets.set(key, bucket)
-      return { allowed: true, remaining: Math.floor(bucket.tokens), retryAfterSeconds: 0 }
+      return { allowed: true, retryAfterSeconds: 0 }
     }
     this.buckets.set(key, bucket)
     const retryAfterSeconds = Math.ceil((1 - bucket.tokens) / refillPerMs / 1000)
-    return { allowed: false, remaining: 0, retryAfterSeconds }
+    return { allowed: false, retryAfterSeconds }
   }
 
   /** Drop idle buckets so a long-lived process does not grow without bound. */
@@ -55,21 +54,31 @@ export class RateLimiter {
   }
 }
 
-/** One shared limiter per route; module scope survives between requests on a warm instance. */
+/** One limiter per route and tier; module scope survives between requests on a warm instance. */
 const registry = new Map<string, RateLimiter>()
 
 export function limiterFor(name: string, options: RateLimitOptions): RateLimiter {
-  let limiter = registry.get(name)
+  const key = `${name}:${options.capacity}/${options.windowMs}`
+  let limiter = registry.get(key)
   if (!limiter) {
     limiter = new RateLimiter(options)
-    registry.set(name, limiter)
+    registry.set(key, limiter)
   }
   if (Math.random() < 0.01) limiter.sweep()
   return limiter
 }
 
+/**
+ * Signed-in callers are keyed by user id. Anonymous callers are keyed by the
+ * client IP as the platform reports it: Vercel sets x-real-ip and rewrites
+ * x-forwarded-for, so neither can be spoofed there. Self-hosted behind nothing,
+ * x-forwarded-for is client-controlled, so the last hop (the one the nearest
+ * proxy appended) is used and absent headers share one bucket.
+ */
 export function clientKey(headers: Headers, userId?: string | null): string {
   if (userId) return `user:${userId}`
-  const forwarded = headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-  return `ip:${forwarded || headers.get("x-real-ip") || "unknown"}`
+  const real = headers.get("x-real-ip")?.trim()
+  const forwarded = headers.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean)
+  const ip = real || forwarded?.at(-1) || "unknown"
+  return `ip:${ip}`
 }

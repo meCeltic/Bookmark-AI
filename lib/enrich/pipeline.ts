@@ -1,5 +1,5 @@
 import { enrichmentSchema, type Enrichment } from "@/lib/domain/bookmark"
-import { fail, ok, type Result } from "@/lib/domain/result"
+import { ok, type Result } from "@/lib/domain/result"
 import { safeFetch } from "@/lib/url/ssrf-guard"
 import { extractPage, type ExtractedPage } from "./extract"
 import { geminiConfigFromEnv, summarizeWithGemini, type AiOutput } from "./gemini"
@@ -95,6 +95,3 @@ function safeHost(url: string): string {
   }
 }
 
-export function pipelineFailure(message: string): Result<Enrichment> {
-  return fail("UPSTREAM", message)
-}

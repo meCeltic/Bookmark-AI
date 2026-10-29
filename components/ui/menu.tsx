@@ -7,9 +7,6 @@ import { cn } from "@/lib/utils"
 export const MenuRoot = Menu.Root
 export const MenuTrigger = Menu.Trigger
 export const MenuSeparator = () => <Menu.Separator className="my-1 h-px bg-border" />
-export const MenuLabel = ({ children }: { children: ReactNode }) => (
-  <Menu.Label className="meta px-2 pb-1 pt-2">{children}</Menu.Label>
-)
 
 export function MenuContent({ children, className, ...props }: ComponentProps<typeof Menu.Content>) {
   return (
@@ -26,7 +23,7 @@ export function MenuContent({ children, className, ...props }: ComponentProps<ty
   )
 }
 
-export function MenuItem({ children, className, danger, shortcut, ...props }: ComponentProps<typeof Menu.Item> & { danger?: boolean; shortcut?: string }) {
+export function MenuItem({ children, className, danger, ...props }: ComponentProps<typeof Menu.Item> & { danger?: boolean }) {
   return (
     <Menu.Item
       className={cn(
@@ -37,7 +34,6 @@ export function MenuItem({ children, className, danger, shortcut, ...props }: Co
       {...props}
     >
       {children}
-      {shortcut ? <span className="kbd ml-auto">{shortcut}</span> : null}
     </Menu.Item>
   )
 }

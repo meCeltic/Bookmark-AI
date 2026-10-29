@@ -35,13 +35,21 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // A redirect must carry any refreshed session cookies, or the next request
+  // presents an already-used refresh token.
+  const redirectWithCookies = (to: URL) => {
+    const redirect = NextResponse.redirect(to)
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie)
+    return redirect
+  }
+
   if (!user && wantsProtected) {
     const login = new URL("/login", request.url)
     login.searchParams.set("next", pathname)
-    return NextResponse.redirect(login)
+    return redirectWithCookies(login)
   }
   if (user && AUTH_PAGES.includes(pathname)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url))
+    return redirectWithCookies(new URL("/dashboard", request.url))
   }
   return response
 }

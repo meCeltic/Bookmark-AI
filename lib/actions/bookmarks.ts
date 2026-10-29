@@ -5,6 +5,7 @@ import { z } from "zod"
 import {
   bookmarkPatchSchema,
   newBookmarkSchema,
+  tagSchema,
   type Bookmark,
   type BookmarkPatch,
   type Collection,
@@ -35,7 +36,8 @@ async function withRepo<T>(fn: (repo: SupabaseRepository) => Promise<Result<T>>)
     if (result.ok) revalidatePath("/dashboard")
     return result
   } catch (error) {
-    return fail("INTERNAL", error instanceof Error ? error.message : "Something went wrong.")
+    console.error("[action]", error)
+    return fail("INTERNAL", "Something went wrong. Please try again.")
   }
 }
 
@@ -85,19 +87,45 @@ export async function deleteCollectionAction(id: string): Promise<Result<void>> 
 }
 
 export async function renameTagAction(from: string, to: string): Promise<Result<{ affected: number }>> {
-  return withRepo((repo) => repo.renameTag(String(from), String(to)))
+  const source = tagSchema.safeParse(from)
+  const target = to.trim() === "" ? { success: true as const, data: "" } : tagSchema.safeParse(to)
+  if (!source.success || !target.success) return fail("VALIDATION", "Tags are lowercase words, digits and - . + #")
+  return withRepo((repo) => repo.renameTag(source.data, target.data))
 }
 
-export async function searchBookmarksAction(query: string): Promise<Result<Bookmark[]>> {
-  const q = z.string().trim().min(1).max(200).safeParse(query)
-  if (!q.success) return ok([])
+export async function listBookmarksAction(): Promise<Result<Bookmark[]>> {
   const repo = await repoForCaller()
   if (!repo.ok) return repo
   try {
-    return ok(await repo.data.search(q.data))
-  } catch (error) {
-    return fail("INTERNAL", error instanceof Error ? error.message : "Search failed.")
+    return ok(await repo.data.listBookmarks())
+  } catch {
+    return fail("INTERNAL", "Could not load your bookmarks.")
   }
+}
+
+export async function listCollectionsAction(): Promise<Result<Collection[]>> {
+  const repo = await repoForCaller()
+  if (!repo.ok) return repo
+  try {
+    return ok(await repo.data.listCollections())
+  } catch {
+    return fail("INTERNAL", "Could not load your collections.")
+  }
+}
+
+const idsSchema = z.array(idSchema).min(1).max(500)
+
+export async function updateBookmarksAction(ids: string[], patch: BookmarkPatch): Promise<Result<Bookmark[]>> {
+  const pids = idsSchema.safeParse(ids)
+  const parsed = bookmarkPatchSchema.safeParse(patch)
+  if (!pids.success || !parsed.success) return fail("VALIDATION", "Invalid change.")
+  return withRepo((repo) => repo.updateBookmarks(pids.data, parsed.data))
+}
+
+export async function deleteBookmarksAction(ids: string[]): Promise<Result<{ deleted: number }>> {
+  const pids = idsSchema.safeParse(ids)
+  if (!pids.success) return fail("VALIDATION", "Invalid ids.")
+  return withRepo((repo) => repo.deleteBookmarks(pids.data))
 }
 
 export async function clearAccountDataAction(): Promise<Result<void>> {

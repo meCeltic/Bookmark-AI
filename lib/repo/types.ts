@@ -16,6 +16,9 @@ export interface BookmarkRepository {
   createBookmark(input: NewBookmark): Promise<Result<Bookmark>>
   updateBookmark(id: string, patch: BookmarkPatch): Promise<Result<Bookmark>>
   deleteBookmark(id: string): Promise<Result<void>>
+  /** Apply one patch to many rows in a single round trip. Returns the rows that changed. */
+  updateBookmarks(ids: string[], patch: BookmarkPatch): Promise<Result<Bookmark[]>>
+  deleteBookmarks(ids: string[]): Promise<Result<{ deleted: number }>>
   /** Bulk create that skips duplicates instead of failing. */
   importBookmarks(inputs: NewBookmark[]): Promise<Result<{ created: Bookmark[]; skipped: number }>>
 

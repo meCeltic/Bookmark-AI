@@ -7,7 +7,7 @@ describe("RateLimiter", () => {
     const limiter = new RateLimiter({ capacity: 3, windowMs: 60_000 }, () => t)
     expect(limiter.take("a").allowed).toBe(true)
     expect(limiter.take("a").allowed).toBe(true)
-    expect(limiter.take("a").remaining).toBe(0)
+    expect(limiter.take("a").allowed).toBe(true)
     const blocked = limiter.take("a")
     expect(blocked.allowed).toBe(false)
     expect(blocked.retryAfterSeconds).toBe(20)

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { SORT_ORDERS, type SortOrder } from "@/lib/domain/bookmark"
 import { normalizeUrl } from "@/lib/url/normalize"
 import { cn, isMac } from "@/lib/utils"
+import { useMounted } from "@/lib/client/use-mounted"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@/components/ui/menu"
 import { useDashboard } from "./provider"
@@ -29,6 +30,7 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
   const [draft, setDraft] = useState("")
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const mounted = useMounted()
   const looksLikeUrl = draft.trim().length > 3 && normalizeUrl(draft.trim()) !== null && /[.:]/.test(draft) && !/\s/.test(draft.trim())
 
   // Debounce the search query; URLs never hit the search.
@@ -93,7 +95,7 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
           </button>
         ) : (
           <button type="button" onClick={onOpenPalette} className="hidden items-center gap-1 text-ink-3 sm:flex" aria-label="Open command palette">
-            <span className="kbd">{isMac() ? "⌘" : "Ctrl"}</span><span className="kbd">K</span>
+            <span className="kbd">{mounted && isMac() ? "⌘" : "Ctrl"}</span><span className="kbd">K</span>
           </button>
         )}
         {looksLikeUrl ? (

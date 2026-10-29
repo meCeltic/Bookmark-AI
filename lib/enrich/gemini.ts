@@ -25,12 +25,13 @@ export interface AiInput {
 export interface GeminiConfig {
   apiKey: string
   model: string
+  timeoutMs: number
 }
 
 export function geminiConfigFromEnv(): GeminiConfig | null {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
-  return { apiKey, model: process.env.GEMINI_MODEL || "gemini-2.5-flash" }
+  return { apiKey, model: process.env.GEMINI_MODEL || "gemini-2.5-flash", timeoutMs: 15_000 }
 }
 
 const RESPONSE_SCHEMA = {
@@ -76,6 +77,7 @@ export async function summarizeWithGemini(
       responseSchema: RESPONSE_SCHEMA,
       temperature: 0.2,
       maxOutputTokens: 400,
+      abortSignal: AbortSignal.timeout(config.timeoutMs),
     },
   })
   return parseAiOutput(response.text)

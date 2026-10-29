@@ -3,9 +3,10 @@ import { LocalRepository, MemoryStore } from "./local"
 import type { BookmarkRepository } from "./types"
 
 /**
- * Contract every repository implementation must satisfy.
- * Run against LocalRepository here; SupabaseRepository is exercised against a
- * real project in CI when credentials are present (see .github/workflows/ci.yml).
+ * Contract every repository implementation must satisfy. It runs against
+ * LocalRepository here. SupabaseRepository shares the same row mapping and is
+ * checked by hand against the migration (see docs/PLAN.md); it has no mocked
+ * test because a fake PostgREST client would only test the fake.
  */
 export function repositoryContract(name: string, make: () => BookmarkRepository) {
   describe(`${name} contract`, () => {
@@ -65,6 +66,18 @@ export function repositoryContract(name: string, make: () => BookmarkRepository)
       if (!r.ok) return
       expect(r.data.created.map((b) => b.title)).toEqual(["B"])
       expect(r.data.skipped).toBe(2)
+    })
+
+    it("updates and deletes many in one call", async () => {
+      const a = await repo.createBookmark({ url: "https://a.com" })
+      const b = await repo.createBookmark({ url: "https://b.com" })
+      await repo.createBookmark({ url: "https://c.com" })
+      if (!a.ok || !b.ok) throw new Error("create failed")
+      const u = await repo.updateBookmarks([a.data.id, b.data.id], { favourite: true })
+      expect(u.ok && u.data.map((x) => x.favourite)).toEqual([true, true])
+      const d = await repo.deleteBookmarks([a.data.id, b.data.id, "missing"])
+      expect(d.ok && d.data.deleted).toBe(2)
+      expect(await repo.listBookmarks()).toHaveLength(1)
     })
 
     it("manages collections and unsorts bookmarks when one is deleted", async () => {

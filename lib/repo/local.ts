@@ -108,6 +108,29 @@ export class LocalRepository implements BookmarkRepository {
     })
   }
 
+  async updateBookmarks(ids: string[], patch: BookmarkPatch): Promise<Result<Bookmark[]>> {
+    return this.mutate((data) => {
+      const wanted = new Set(ids)
+      const changed: Bookmark[] = []
+      data.bookmarks = data.bookmarks.map((b) => {
+        if (!wanted.has(b.id)) return b
+        const next = applyPatch(b, patch)
+        changed.push(next)
+        return next
+      })
+      return ok(changed)
+    })
+  }
+
+  async deleteBookmarks(ids: string[]): Promise<Result<{ deleted: number }>> {
+    return this.mutate((data) => {
+      const wanted = new Set(ids)
+      const before = data.bookmarks.length
+      data.bookmarks = data.bookmarks.filter((b) => !wanted.has(b.id))
+      return ok({ deleted: before - data.bookmarks.length })
+    })
+  }
+
   async importBookmarks(inputs: NewBookmark[]): Promise<Result<{ created: Bookmark[]; skipped: number }>> {
     return this.mutate((data) => {
       const keys = new Set(data.bookmarks.map((b) => b.urlNormalized))

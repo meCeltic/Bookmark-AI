@@ -31,6 +31,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
   const { state, counts } = api
   const [newName, setNewName] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
+  const [tagEdit, setTagEdit] = useState<{ from: string; to: string } | null>(null)
 
   const select = (view: typeof state.view) => {
     api.dispatch({ type: "view", view })
@@ -145,18 +146,48 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
           <div className="mt-1 px-2">
             {counts.tags.slice(0, 16).map(({ tag, count }) => {
               const active = state.tags.includes(tag)
+              if (tagEdit?.from === tag) {
+                return (
+                  <input
+                    key={tag}
+                    autoFocus
+                    className="rule-input mx-2 my-1 font-mono text-[12px]"
+                    value={tagEdit.to}
+                    maxLength={32}
+                    placeholder="new name, empty removes"
+                    onChange={(e) => setTagEdit({ from: tag, to: e.target.value })}
+                    onBlur={() => setTagEdit(null)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") { void api.renameTag(tag, tagEdit.to); setTagEdit(null) }
+                      if (e.key === "Escape") setTagEdit(null)
+                    }}
+                  />
+                )
+              }
               return (
-                <button
-                  key={tag}
-                  type="button"
-                  className={cn("flex w-full items-center gap-2 rounded-[2px] px-2 py-1 text-left font-mono text-[12px] transition-colors hover:bg-surface", active ? "text-accent" : "text-ink-2")}
-                  aria-pressed={active}
-                  onClick={() => api.dispatch({ type: "tags", tags: active ? state.tags.filter((t) => t !== tag) : [...state.tags, tag] })}
-                >
-                  <span className={cn("w-2 text-center", active ? "text-accent" : "text-ink-3")}>{active ? "×" : "#"}</span>
-                  <span className="truncate">{tag}</span>
-                  <span className="ml-auto text-[11px] text-ink-3">{count}</span>
-                </button>
+                <div key={tag} className="group flex items-center rounded-[2px] hover:bg-surface">
+                  <button
+                    type="button"
+                    className={cn("flex min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left font-mono text-[12px] transition-colors", active ? "text-accent" : "text-ink-2")}
+                    aria-pressed={active}
+                    onClick={() => api.dispatch({ type: "tags", tags: active ? state.tags.filter((t) => t !== tag) : [...state.tags, tag] })}
+                  >
+                    <span className={cn("w-2 text-center", active ? "text-accent" : "text-ink-3")}>{active ? "×" : "#"}</span>
+                    <span className="truncate">{tag}</span>
+                    <span className="ml-auto text-[11px] text-ink-3">{count}</span>
+                  </button>
+                  <MenuRoot>
+                    <MenuTrigger asChild>
+                      <button type="button" className="btn btn-ghost btn-icon mr-1 h-6 w-6 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100" aria-label={`Options for tag ${tag}`}>
+                        <MoreHorizontal size={13} />
+                      </button>
+                    </MenuTrigger>
+                    <MenuContent>
+                      <MenuItem onSelect={() => setTagEdit({ from: tag, to: tag })}><Pencil size={13} /> Rename or merge</MenuItem>
+                      <MenuItem danger onSelect={() => api.renameTag(tag, "")}><Trash2 size={13} /> Remove from all cards</MenuItem>
+                    </MenuContent>
+                  </MenuRoot>
+                </div>
               )
             })}
           </div>

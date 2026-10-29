@@ -3,11 +3,12 @@
 import { redirect } from "next/navigation"
 import { z } from "zod"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { safeNextPath } from "@/lib/url/safe-path"
 
 const credentials = z.object({
   email: z.string().trim().email(),
   password: z.string().min(8, "Use at least 8 characters."),
-  next: z.string().startsWith("/").optional(),
+  next: z.string().max(500).optional(),
 })
 
 export interface AuthState {
@@ -26,7 +27,7 @@ export async function signInAction(_prev: AuthState, form: FormData): Promise<Au
   if (!supabase) return { error: "Sign-in is not configured on this deployment. Use the demo." }
   const { error } = await supabase.auth.signInWithPassword({ email: parsed.data.email, password: parsed.data.password })
   if (error) return { error: "Email or password did not match." }
-  redirect(parsed.data.next && parsed.data.next.startsWith("/") && !parsed.data.next.startsWith("//") ? parsed.data.next : "/dashboard")
+  redirect(safeNextPath(parsed.data.next))
 }
 
 export async function signUpAction(_prev: AuthState, form: FormData): Promise<AuthState> {
@@ -39,7 +40,8 @@ export async function signUpAction(_prev: AuthState, form: FormData): Promise<Au
     password: parsed.data.password,
     options: { emailRedirectTo: `${siteUrl()}/auth/callback?next=/dashboard` },
   })
-  if (error) return { error: error.message }
+  // One generic message: the specific Supabase text would reveal whether the address is registered.
+  if (error) return { error: "Could not create the account with those details." }
   if (data.session) redirect("/dashboard")
   return { notice: "Check your inbox. The link in the email finishes creating the account." }
 }

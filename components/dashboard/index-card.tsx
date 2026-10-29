@@ -1,7 +1,7 @@
 "use client"
 
 import { Archive, ArchiveRestore, BookOpen, Check, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
-import { memo, useState, type KeyboardEvent, type MouseEvent } from "react"
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react"
 import { toast } from "sonner"
 import type { Bookmark } from "@/lib/domain/bookmark"
 import { domainOf } from "@/lib/url/normalize"
@@ -20,11 +20,20 @@ interface Props {
   onFocus: () => void
 }
 
-export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focused, pending, selected, onFocus }: Props) {
+export function IndexCard({ bookmark, layout, index, focused, pending, selected, onFocus }: Props) {
   const api = useDashboard()
   const [tagDraft, setTagDraft] = useState<string | null>(null)
   const { state } = api
   const selecting = state.selected.size > 0
+
+  // "t" on a focused card opens the tag input (see keyboard.tsx).
+  useEffect(() => {
+    const onTag = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === bookmark.id) setTagDraft("")
+    }
+    window.addEventListener("bookmark-ai:tag", onTag)
+    return () => window.removeEventListener("bookmark-ai:tag", onTag)
+  }, [bookmark.id])
 
   const toggleSelect = (e?: MouseEvent) => {
     e?.stopPropagation()
@@ -157,9 +166,7 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
   // ---------------------------------------------------------------- list ----
   if (layout === "list") {
     return (
-      <div
-        role="row"
-        tabIndex={-1}
+      <li
         data-id={bookmark.id}
         data-selected={selected}
         data-focused={focused}
@@ -174,7 +181,7 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
         {selectBox}
         <Favicon url={bookmark.url} src={bookmark.faviconUrl} />
         <div className="flex min-w-0 flex-1 items-baseline gap-3">
-          <span className={cn("truncate font-display text-[15px] font-medium", unread && "font-semibold")}>{bookmark.title}</span>
+          <a href={bookmark.url} onClick={(e) => e.preventDefault()} tabIndex={0} onFocus={onFocus} className={cn("truncate font-display text-[15px] font-medium outline-none", unread && "font-semibold")}>{bookmark.title}</a>
           <span className="hidden truncate font-mono text-[11px] text-ink-3 sm:inline">{domain}</span>
         </div>
         <div className="hidden items-center gap-1.5 md:flex">{bookmark.tags.slice(0, 3).map((t) => <span key={t} className="stamp stamp-quiet pointer-events-none h-[18px]">{t}</span>)}</div>
@@ -182,14 +189,13 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
         {bookmark.health === "dead" ? <span className="font-mono text-[10px] uppercase text-danger">dead</span> : null}
         <span className="w-14 text-right font-mono text-[11px] text-ink-3">{formatDate(bookmark.createdAt)}</span>
         <div onClick={(e) => e.stopPropagation()}>{menu}</div>
-      </div>
+      </li>
     )
   }
 
   // ---------------------------------------------------------------- grid ----
   return (
-    <article
-      tabIndex={-1}
+    <li
       data-id={bookmark.id}
       data-selected={selected}
       data-focused={focused}
@@ -223,7 +229,10 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
       </header>
 
       <h3 className={cn("line-clamp-2 font-display text-[17px] font-semibold leading-snug", pending && "text-ink-2")}>
-        {pending && !bookmark.description ? <span className="caret">{bookmark.title}</span> : bookmark.title}
+        {/* A real link, so Tab reaches every card and the URL shows in the status bar; the click is handled by the card. */}
+        <a href={bookmark.url} onClick={(e) => e.preventDefault()} onFocus={onFocus} className="outline-none">
+          {pending && !bookmark.description ? <span className="caret">{bookmark.title}</span> : bookmark.title}
+        </a>
       </h3>
 
       {bookmark.summary ? (
@@ -250,6 +259,6 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
           {menu}
         </span>
       </footer>
-    </article>
+    </li>
   )
-})
+}

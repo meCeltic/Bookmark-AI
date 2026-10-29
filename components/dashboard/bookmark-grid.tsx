@@ -39,12 +39,11 @@ export function BookmarkGrid() {
   }
 
   return (
-    <div
-      role={state.layout === "list" ? "table" : undefined}
+    <ul
       className={cn(
         state.layout === "grid"
           ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-          : "card divide-y-0 overflow-hidden",
+          : "card overflow-hidden",
       )}
     >
       {items.map((b, i) => (
@@ -59,6 +58,6 @@ export function BookmarkGrid() {
           onFocus={() => setFocusId(b.id)}
         />
       ))}
-    </div>
+    </ul>
   )
 }

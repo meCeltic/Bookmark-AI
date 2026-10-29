@@ -34,7 +34,7 @@ export default function Home() {
               </Link>
               {cloud ? <Link href="/signup" className="btn h-11 px-5 text-[15px]">Create an account</Link> : null}
             </div>
-            <p className="mt-3 font-mono text-[11.5px] text-ink-3">no sign-up for the demo · nothing leaves your browser</p>
+            <p className="mt-3 font-mono text-[11.5px] text-ink-3">no sign-up for the demo · demo cards stay in this browser</p>
           </div>
           <LiveCard />
         </section>

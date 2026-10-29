@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { HTTP_STATUS } from "@/lib/domain/result"
+import { errorResponse, readJsonBody } from "@/lib/http"
 import { enrichUrl } from "@/lib/enrich/pipeline"
 import { clientKey, limiterFor } from "@/lib/ratelimit"
 import { getSessionUser } from "@/lib/supabase/server"
@@ -21,24 +21,17 @@ export async function POST(request: Request) {
   const limiter = limiterFor("enrich", user ? { capacity: 30, windowMs: 60_000 } : { capacity: 12, windowMs: 60_000 })
   const verdict = limiter.take(clientKey(request.headers, user?.id))
   if (!verdict.allowed) {
-    return NextResponse.json(
-      { error: { code: "RATE_LIMITED", message: "Too many pages at once. Try again shortly." } },
-      { status: 429, headers: { "Retry-After": String(verdict.retryAfterSeconds) } },
+    return errorResponse(
+      { code: "RATE_LIMITED", message: "Too many pages at once. Try again shortly." },
+      { "Retry-After": String(verdict.retryAfterSeconds) },
     )
   }
 
-  const body = bodySchema.safeParse(await request.json().catch(() => null))
+  const body = bodySchema.safeParse(await readJsonBody(request))
   const url = body.success ? normalizeUrl(body.data.url) : null
-  if (!url) {
-    return NextResponse.json(
-      { error: { code: "VALIDATION", message: "That does not look like a web address." } },
-      { status: 400 },
-    )
-  }
+  if (!url) return errorResponse({ code: "VALIDATION", message: "That does not look like a web address." })
 
   const result = await enrichUrl(url)
-  if (!result.ok) {
-    return NextResponse.json({ error: result.error }, { status: HTTP_STATUS[result.error.code] })
-  }
+  if (!result.ok) return errorResponse(result.error)
   return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } })
 }

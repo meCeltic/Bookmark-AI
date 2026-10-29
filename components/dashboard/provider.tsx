@@ -12,15 +12,15 @@ import {
   type ReactNode,
 } from "react"
 import { toast } from "sonner"
-import type {
-  Bookmark,
-  BookmarkPatch,
-  Collection,
-  NewBookmark,
-  SortOrder,
-  ViewSelection,
+import {
+  tagSchema,
+  type Bookmark,
+  type BookmarkPatch,
+  type Collection,
+  type NewBookmark,
+  type SortOrder,
+  type ViewSelection,
 } from "@/lib/domain/bookmark"
-import type { AppError } from "@/lib/domain/result"
 import type { BookmarkRepository, RepositoryMode } from "@/lib/repo/types"
 import { materialize } from "@/lib/repo/shared"
 import { requestEnrichment, requestHealth } from "@/lib/client/enrich"
@@ -168,10 +168,6 @@ interface ProviderProps {
   children: ReactNode
 }
 
-function describe(error: AppError): string {
-  return error.message
-}
-
 export function DashboardProvider({ mode, repo, initial, seed, children }: ProviderProps) {
   const [state, dispatch] = useReducer(reducer, undefined, () => ({
     bookmarks: initial.bookmarks,
@@ -187,6 +183,11 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   }))
   const [hydrated, setHydrated] = useState(mode === "cloud")
   const enrichAborts = useRef(new Map<string, AbortController>())
+  // Always the latest bookmarks, for callbacks that resolve after a state change.
+  const latest = useRef(state.bookmarks)
+  useEffect(() => {
+    latest.current = state.bookmarks
+  }, [state.bookmarks])
 
   const reload = useCallback(async () => {
     const [bookmarks, collections] = await Promise.all([repo.listBookmarks(), repo.listCollections()])
@@ -250,7 +251,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
         dispatch({ type: "upsert", bookmark: result.data })
       } else {
         if (rollback) dispatch({ type: "upsert", bookmark: rollback })
-        if (!silent) toast.error(describe(result.error))
+        if (!silent) toast.error(result.error.message)
       }
     },
     [repo],
@@ -271,14 +272,18 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
           return
         }
         const e = res.data
+        // The user may have edited the card while it was being read; their
+        // title wins and their tags are kept alongside the suggested ones.
+        const current = latest.current.find((b) => b.id === bookmark.id) ?? bookmark
+        const userTitled = current.title !== bookmark.title
         const patch: BookmarkPatch = {
-          title: e.title || bookmark.title,
+          title: userTitled ? current.title : e.title || current.title,
           description: e.description,
           summary: e.summary,
-          tags: e.tags.length ? e.tags : bookmark.tags,
+          tags: [...new Set([...current.tags, ...e.tags])].slice(0, 8),
           category: e.category,
-          faviconUrl: e.faviconUrl,
-          imageUrl: e.imageUrl,
+          faviconUrl: e.faviconUrl ?? current.faviconUrl,
+          imageUrl: e.imageUrl ?? current.imageUrl,
           readingMinutes: e.readingMinutes,
           enrichment: e.source === "ai" ? "done" : e.source === "metadata" ? "fallback" : "failed",
         }
@@ -301,7 +306,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
         return null
       }
       const key = canonicalKey(url)
-      const existing = state.bookmarks.find((b) => b.urlNormalized === key)
+      const existing = latest.current.find((b) => b.urlNormalized === key)
       if (existing) {
         toast("Already in your drawer", {
           description: `Saved ${new Date(existing.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.`,
@@ -327,7 +332,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       if (!result.ok) {
         dispatch({ type: "remove", ids: [optimistic.id] })
         dispatch({ type: "pending", id: optimistic.id, on: false })
-        toast.error(describe(result.error))
+        toast.error(result.error.message)
         return null
       }
       // Swap the optimistic id for the real one before enrichment lands.
@@ -337,7 +342,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       void enrich(result.data)
       return result.data
     },
-    [repo, state.bookmarks, state.view, enrich],
+    [repo, state.view, enrich],
   )
 
   const reEnrich = useCallback<DashboardApi["reEnrich"]>(
@@ -365,22 +370,23 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       const stamp = new Date().toISOString()
       dispatch({ type: "upsertMany", bookmarks: targets.map((b) => ({ ...b, ...p, updatedAt: stamp })) })
       dispatch({ type: "select", ids: [], mode: "set" })
-      const results = await Promise.all(targets.map((b) => repo.updateBookmark(b.id, p)))
-      const failed = results.filter((r) => !r.ok).length
-      if (failed) {
+      const result = await repo.updateBookmarks(targets.map((b) => b.id), p)
+      if (!result.ok) {
         dispatch({ type: "upsertMany", bookmarks: targets })
-        toast.error(`Could not ${label} ${failed} of ${targets.length}.`)
-      } else {
-        toast(`${label.charAt(0).toUpperCase() + label.slice(1)} ${targets.length} ${targets.length === 1 ? "card" : "cards"}`, {
-          action: {
-            label: "Undo",
-            onClick: () => {
-              dispatch({ type: "upsertMany", bookmarks: targets })
-              void Promise.all(targets.map((b) => repo.updateBookmark(b.id, revertPatch(b, p))))
-            },
-          },
-        })
+        toast.error(`Could not ${label} those cards.`)
+        return
       }
+      dispatch({ type: "upsertMany", bookmarks: result.data })
+      toast(`${label.charAt(0).toUpperCase() + label.slice(1)} ${targets.length} ${targets.length === 1 ? "card" : "cards"}`, {
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            dispatch({ type: "upsertMany", bookmarks: targets })
+            // The original values may differ per card, so undo is per card.
+            await Promise.all(targets.map((b) => repo.updateBookmark(b.id, revertPatch(b, p))))
+          },
+        },
+      })
     },
     [repo, state.bookmarks],
   )
@@ -391,8 +397,8 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       if (!targets.length) return
       for (const b of targets) enrichAborts.current.get(b.id)?.abort()
       dispatch({ type: "remove", ids })
-      const results = await Promise.all(targets.map((b) => repo.deleteBookmark(b.id)))
-      if (results.some((r) => !r.ok)) {
+      const result = await repo.deleteBookmarks(targets.map((b) => b.id))
+      if (!result.ok) {
         dispatch({ type: "upsertMany", bookmarks: targets })
         toast.error("Could not delete. Nothing was removed.")
         return
@@ -407,11 +413,11 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
             undone = true
             const res = await repo.importBookmarks(targets.map(toNewBookmark))
             if (res.ok) {
-              const restored = res.data.created.map((b, i) => ({
-                ...b,
-                health: targets[i]?.health ?? "unknown",
-                lastOpenedAt: targets[i]?.lastOpenedAt ?? null,
-              }))
+              const byKey = new Map(targets.map((b) => [b.urlNormalized, b]))
+              const restored = res.data.created.map((b) => {
+                const was = byKey.get(b.urlNormalized)
+                return { ...b, health: was?.health ?? "unknown", lastOpenedAt: was?.lastOpenedAt ?? null }
+              })
               dispatch({ type: "upsertMany", bookmarks: restored })
             } else toast.error("Could not restore.")
           },
@@ -433,13 +439,18 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   const addTag = useCallback<DashboardApi["addTag"]>(
     async (id, tag) => {
       const current = state.bookmarks.find((b) => b.id === id)
-      const clean = tag.trim().toLowerCase()
-      if (!current || !clean || current.tags.includes(clean)) return
+      const parsed = tagSchema.safeParse(tag)
+      if (!current) return
+      if (!parsed.success) {
+        toast.error("Tags are lowercase words, digits and - . + #")
+        return
+      }
+      if (current.tags.includes(parsed.data)) return
       if (current.tags.length >= 8) {
         toast.error("Eight tags is plenty for one card.")
         return
       }
-      await patch(id, { tags: [...current.tags, clean] })
+      await patch(id, { tags: [...current.tags, parsed.data] })
     },
     [state.bookmarks, patch],
   )
@@ -455,9 +466,14 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
 
   const renameTag = useCallback<DashboardApi["renameTag"]>(
     async (from, to) => {
-      const result = await repo.renameTag(from, to)
+      const target = to.trim()
+      if (target && !tagSchema.safeParse(target).success) {
+        toast.error("Tags are lowercase words, digits and - . + #")
+        return
+      }
+      const result = await repo.renameTag(from, target)
       if (!result.ok) {
-        toast.error(describe(result.error))
+        toast.error(result.error.message)
         return
       }
       await reload()
@@ -473,7 +489,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     async (name) => {
       const result = await repo.createCollection(name)
       if (!result.ok) {
-        toast.error(describe(result.error))
+        toast.error(result.error.message)
         return null
       }
       dispatch({ type: "collections", collections: [...state.collections, result.data] })
@@ -486,7 +502,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     async (id, name) => {
       const result = await repo.renameCollection(id, name)
       if (!result.ok) {
-        toast.error(describe(result.error))
+        toast.error(result.error.message)
         return
       }
       dispatch({ type: "collections", collections: state.collections.map((c) => (c.id === id ? result.data : c)) })
@@ -498,7 +514,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     async (id) => {
       const result = await repo.deleteCollection(id)
       if (!result.ok) {
-        toast.error(describe(result.error))
+        toast.error(result.error.message)
         return
       }
       dispatch({ type: "collections", collections: state.collections.filter((c) => c.id !== id) })
@@ -542,7 +558,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       }))
       const result = await repo.importBookmarks(inputs)
       if (!result.ok) {
-        toast.error(describe(result.error))
+        toast.error(result.error.message)
         return { created: 0, skipped }
       }
       dispatch({ type: "upsertMany", bookmarks: result.data.created })
@@ -562,7 +578,10 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
         const stamp = new Date().toISOString()
         const updated = targets.map((b) => ({ ...b, health: byUrl.get(b.url) ?? b.health, healthCheckedAt: stamp }))
         dispatch({ type: "upsertMany", bookmarks: updated })
-        await Promise.all(updated.map((b) => repo.updateBookmark(b.id, { health: b.health, healthCheckedAt: stamp })))
+        // One round trip per health value rather than one per card.
+        const groups = new Map<Bookmark["health"], string[]>()
+        for (const b of updated) groups.set(b.health, [...(groups.get(b.health) ?? []), b.id])
+        await Promise.all([...groups].map(([health, ids]) => repo.updateBookmarks(ids, { health, healthCheckedAt: stamp })))
         const dead = updated.filter((b) => b.health === "dead").length
         toast.success(dead ? `${dead} of ${targets.length} links look dead` : `All ${targets.length} links are alive`, {
           id,

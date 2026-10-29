@@ -21,7 +21,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
     a.href = URL.createObjectURL(blob)
     a.download = exportFilename(kind)
     a.click()
-    URL.revokeObjectURL(a.href)
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
     onOpenChange(false)
   }
 

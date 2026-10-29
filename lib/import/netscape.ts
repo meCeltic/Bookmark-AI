@@ -1,4 +1,5 @@
 import { exportFileSchema } from "@/lib/export"
+import { decodeEntities } from "@/lib/enrich/extract"
 
 export interface ImportedBookmark {
   url: string
@@ -19,23 +20,8 @@ export interface ParsedImport {
 // ---------------------------------------------------------------------------
 // Entities
 
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-}
-
-export const decodeEntities = (s: string): string =>
-  s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, body: string) => {
-    if (body.startsWith("#x") || body.startsWith("#X")) {
-      return String.fromCodePoint(Number.parseInt(body.slice(2), 16))
-    }
-    if (body.startsWith("#")) return String.fromCodePoint(Number.parseInt(body.slice(1), 10))
-    return NAMED_ENTITIES[body.toLowerCase()] ?? whole
-  })
+// One entity decoder for the whole app; the extractor's handles the numeric edge cases.
+export { decodeEntities }
 
 // ---------------------------------------------------------------------------
 // Tokenizer
