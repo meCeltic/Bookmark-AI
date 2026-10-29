@@ -14,13 +14,16 @@ interface ContentProps {
   className?: string
   /** Visually hide the header while keeping it for screen readers. */
   bare?: boolean
+  /** Leave focus where it was on open (for read-only sheets); Escape still closes. */
+  noAutoFocus?: boolean
 }
 
-export function DialogContent({ title, description, children, className, bare }: ContentProps) {
+export function DialogContent({ title, description, children, className, bare, noAutoFocus }: ContentProps) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-ink/30 dark:bg-black/60" />
       <DialogPrimitive.Content
+        onOpenAutoFocus={noAutoFocus ? (e) => e.preventDefault() : undefined}
         className={cn(
           "card anim-pop fixed left-1/2 top-[12vh] z-50 w-[520px] max-w-[calc(100vw-32px)] -translate-x-1/2 p-0 shadow-card outline-none",
           className,

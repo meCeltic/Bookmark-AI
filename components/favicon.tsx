@@ -36,6 +36,7 @@ export function Favicon({ url, src, size = 16, className }: Props) {
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
+      onLoad={(e) => { if (e.currentTarget.naturalWidth === 0) setFailed(true) }}
       className={cn("shrink-0 rounded-[2px] object-contain", className)}
       style={{ width: size, height: size }}
     />

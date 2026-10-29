@@ -264,12 +264,6 @@ h1, h2, h3 {
   .card-actions[data-focused="true"] .card-buttons {
     opacity: 1;
   }
-  @media (hover: none) {
-    .card-buttons { opacity: 1; }
-    .btn-icon { width: 36px; height: 36px; }
-    .stamp { height: 24px; padding: 0 9px; }
-  }
-
   /* Controls that appear on hover where hover exists, and are simply there on touch. */
   .hover-reveal {
     opacity: 0;
@@ -281,18 +275,57 @@ h1, h2, h3 {
   .hover-reveal[aria-checked="true"] {
     opacity: 1;
   }
-  @media (hover: none) {
-    .hover-reveal { opacity: 1; }
-  }
-
-  /* Selection check: sits on the card's left edge like a tab, takes no space in the row. */
-  .select-tab {
-    position: absolute;
-    left: -1px;
-    top: 14px;
+  /* Selection check: takes the favicon's slot on hover or while selecting. */
+  .select-slot {
+    position: relative;
+    display: inline-flex;
     width: 16px;
     height: 16px;
-    transform: translateX(-50%);
+    flex-shrink: 0;
+  }
+  .select-slot .select-check {
+    position: absolute;
+    inset: 0;
+  }
+  .select-slot .select-icon {
+    transition: opacity 120ms var(--ease-enter);
+  }
+  .group:hover .select-slot .select-icon,
+  .select-slot[data-selecting="true"] .select-icon {
+    opacity: 0;
+  }
+
+  /* Tag stamp with a removable tail: the × is a sibling button that appears on hover. */
+  .stamp-group {
+    display: inline-flex;
+    align-items: stretch;
+  }
+  .stamp-group:hover .stamp {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right-width: 0;
+  }
+  .stamp-x {
+    display: none;
+    align-items: center;
+    height: 20px;
+    padding: 0 6px 0 4px;
+    border: 1px solid var(--accent);
+    border-radius: 0 999px 999px 0;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    line-height: 1;
+    background: transparent;
+    cursor: pointer;
+  }
+  .stamp-group:hover .stamp-x {
+    display: inline-flex;
+  }
+  .stamp-x:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--accent-ink);
   }
 
   .kbd {
@@ -361,3 +394,22 @@ h1, h2, h3 {
 
 /* Scrollbars in the sidebar should be quiet. */
 .quiet-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+
+/* ------------------------------------------------------------------ touch */
+/* Unlayered on purpose: these must win over utility classes.                */
+@media (hover: none) {
+  .card-buttons { opacity: 1; }
+  .hover-reveal { opacity: 0; }
+  [data-editing="true"] .hover-reveal,
+  .hover-reveal[aria-checked="true"],
+  .hover-reveal[data-state="open"] { opacity: 1; }
+  .select-slot .select-icon { opacity: 1; }
+  .select-slot[data-selecting="true"] .select-icon { opacity: 0; }
+  .select-slot .select-check { opacity: 0; }
+  .select-slot[data-selecting="true"] .select-check { opacity: 1; }
+  [data-editing="true"] .stamp-group .stamp-x { display: inline-flex; }
+  [data-editing="true"] .stamp-group .stamp { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right-width: 0; }
+  .stamp, .stamp-x { height: 26px; padding-left: 10px; padding-right: 10px; font-size: 11.5px; }
+  .btn-icon.h-7, .btn-icon.h-6 { width: 36px !important; height: 36px !important; }
+  .btn-sm { height: 36px; }
+}

@@ -48,7 +48,7 @@ export default function Home() {
               The server fetches the page through a guard that refuses private addresses and re-checks every redirect, extracts the article text, and hands six kilobytes of it to Gemini with a fixed JSON schema. Whatever comes back is validated before it touches the card. No key, no quota? The page&rsquo;s own description is used instead, and the card says so.
             </p>
           </div>
-          <ol className="space-y-3">
+          <ol className="divide-y divide-border border-y border-border-strong">
             <Stage n="01" title="Fetch, guarded" body="http(s) only · DNS resolved and checked against private ranges · 3 redirects, re-validated · 1 MiB cap · 5 s budget" />
             <Stage n="02" title="Extract" body="og / twitter / title precedence · favicon and image resolved · article or main text · entities decoded · reading time" />
             <Stage n="03" title="Summarise, then verify" body="Gemini structured output · Zod-validated · 3–5 tags · a category · falls back to metadata, labelled honestly" />
@@ -110,7 +110,7 @@ export default function Home() {
 
 function Stage({ n, title, body }: { n: string; title: string; body: string }) {
   return (
-    <li className="card flex gap-4 p-4">
+    <li className="flex gap-4 py-4">
       <span className="font-mono text-[12px] text-accent">{n}</span>
       <div>
         <h3 className="font-display text-[17px] font-semibold">{title}</h3>

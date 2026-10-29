@@ -95,7 +95,7 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
           </button>
         ) : (
           <button type="button" onClick={onOpenPalette} className="hidden items-center gap-1 text-ink-3 sm:flex" aria-label="Open command palette">
-            <span className="kbd">{mounted && isMac() ? "⌘" : "Ctrl"}</span><span className="kbd">K</span>
+            <span className="kbd">{mounted && isMac() ? "⌘K" : "Ctrl K"}</span>
           </button>
         )}
         {looksLikeUrl ? (

@@ -22,7 +22,7 @@ const ROWS: Array<[string, string]> = [
 export function HelpSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title="Keyboard" description="Everything works without a mouse.">
+      <DialogContent title="Keyboard" description="Everything works without a mouse." noAutoFocus>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 p-5 text-[13.5px]">
           {ROWS.map(([key, label]) => (
             <div key={key} className="flex items-center justify-between gap-3 border-b border-border py-1">

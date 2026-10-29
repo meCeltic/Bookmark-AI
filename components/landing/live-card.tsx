@@ -67,15 +67,17 @@ const SAMPLES: Sample[] = [
 type Stage = "idle" | "typing" | "reading" | "title" | "summary" | "tags" | "done"
 
 export function LiveCard() {
-  const [draft, setDraft] = useState("")
-  const [url, setUrl] = useState<string | null>(null)
-  const [result, setResult] = useState<Enrichment | null>(null)
-  const [stage, setStage] = useState<Stage>("idle")
-  const [shownSummary, setShownSummary] = useState("")
-  const [shownTags, setShownTags] = useState(0)
+  // Start on a finished card so the hero is never blank, then cycle from the second sample.
+  const first = SAMPLES[0]!
+  const [draft, setDraft] = useState(first.url.replace(/^https?:\/\//, ""))
+  const [url, setUrl] = useState<string | null>(first.url)
+  const [result, setResult] = useState<Enrichment | null>(first.result)
+  const [stage, setStage] = useState<Stage>("done")
+  const [shownSummary, setShownSummary] = useState(first.result.summary ?? "")
+  const [shownTags, setShownTags] = useState(first.result.tags.length)
   const [error, setError] = useState<string | null>(null)
   const [own, setOwn] = useState(false)
-  const sampleIndex = useRef(0)
+  const sampleIndex = useRef(1)
   const timers = useRef<number[]>([])
   const reduced = useRef(false)
 
@@ -85,9 +87,11 @@ export function LiveCard() {
   // Play a result through the stages: reading → title → summary typed → tags stamped.
   const play = (target: string, r: Enrichment, typeUrl: boolean) => {
     clear()
-    setResult(null); setShownSummary(""); setShownTags(0); setError(null)
-    setUrl(target)
+    setError(null)
+    // The previous card stays on screen while the next URL types in.
     const begin = () => {
+      setUrl(target)
+      setResult(null); setShownSummary(""); setShownTags(0)
       setStage("reading")
       later(() => { setResult(r); setStage("title") }, 700)
       later(() => setStage("summary"), 1100)
@@ -119,7 +123,7 @@ export function LiveCard() {
       play(s.url, s.result, true)
       timers.current.push(window.setTimeout(loop, reduced.current ? 6000 : 7500))
     }
-    loop()
+    timers.current.push(window.setTimeout(loop, reduced.current ? 6000 : 4500))
     return () => { cancelled = true; clear() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -128,8 +132,8 @@ export function LiveCard() {
     e.preventDefault()
     const target = normalizeUrl(draft)
     if (!target) { setError("That does not look like a web address."); return }
-    clear(); setOwn(true); setResult(null); setShownSummary(""); setShownTags(0); setError(null)
-    setUrl(target); setStage("reading")
+    clear(); setOwn(true); setError(null)
+    setUrl(target); setResult(null); setShownSummary(""); setShownTags(0); setStage("reading")
     const res = await requestEnrichment(target)
     if (!res.ok) { setStage("idle"); setError(res.error.message); return }
     play(target, res.data, false)
@@ -156,7 +160,7 @@ export function LiveCard() {
       {error ? <p className="mt-2 text-[13px] text-danger">{error}</p> : null}
 
       <div className="mt-4 min-h-[172px]">
-        {url && stage !== "idle" && stage !== "typing" ? (
+        {url && result ? (
           <article className="anim-enter">
             <header className="flex items-center gap-2">
               <Favicon url={url} src={result?.faviconUrl ?? null} />
@@ -178,6 +182,15 @@ export function LiveCard() {
                 {result.tags.length === 0 ? <span className="font-mono text-[10.5px] text-ink-3">no tags without an ai key</span> : null}
               </div>
             ) : null}
+          </article>
+        ) : url && stage === "reading" ? (
+          <article className="anim-enter">
+            <header className="flex items-center gap-2">
+              <Favicon url={url} src={null} />
+              <span className="meta truncate">{domainOf(url)}</span>
+              <span className="ml-auto font-mono text-[10.5px] text-ink-3">reading page…</span>
+            </header>
+            <h3 className="mt-2 font-display text-[19px] font-semibold leading-snug"><span className="caret text-ink-3">{domainOf(url)}</span></h3>
           </article>
         ) : (
           <p className="font-mono text-[12px] text-ink-3">{own ? "paste a link and press read" : "…"}</p>

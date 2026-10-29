@@ -77,6 +77,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
       <MenuContent onClick={(e) => e.stopPropagation()}>
         <MenuItem onSelect={() => api.open(bookmark)}><ExternalLink size={14} /> Open<span className="kbd ml-auto">↵</span></MenuItem>
         <MenuItem onSelect={copy}><Copy size={14} /> Copy link<span className="kbd ml-auto">c</span></MenuItem>
+        <MenuItem onSelect={() => toggleSelect()}><Check size={14} /> {selected ? "Deselect" : "Select"}<span className="kbd ml-auto">x</span></MenuItem>
         <MenuSeparator />
         <MenuItem onSelect={() => api.patch(bookmark.id, { favourite: !bookmark.favourite })}>
           <Star size={14} /> {bookmark.favourite ? "Unfavourite" : "Favourite"}<span className="kbd ml-auto">f</span>
@@ -108,10 +109,10 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
   const tags = (
     <div className="flex flex-wrap items-center gap-1.5">
       {bookmark.tags.map((tag) => (
-        <span key={tag} className="group/stamp relative inline-flex">
+        <span key={tag} className="stamp-group anim-stamp">
           <button
             type="button"
-            className="stamp anim-stamp"
+            className="stamp"
             data-active={state.tags.includes(tag)}
             title={state.tags.includes(tag) ? `Stop filtering by ${tag}` : `Filter by ${tag}`}
             onClick={(e) => {
@@ -126,7 +127,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
             type="button"
             aria-label={`Remove tag ${tag}`}
             title="Remove tag"
-            className="hover-reveal absolute -right-1.5 -top-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-surface font-mono text-[10px] leading-none text-ink-2 hover:border-danger hover:text-danger"
+            className="stamp-x"
             onClick={(e) => {
               e.stopPropagation()
               void api.removeTag(bookmark.id, tag)
@@ -155,21 +156,25 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
     </div>
   )
 
-  const selectBox = (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={selected}
-      aria-label={selected ? "Deselect" : "Select"}
-      onClick={toggleSelect}
-      className={cn(
-        "select-tab hover-reveal inline-flex items-center justify-center rounded-[2px] border transition-colors",
-        selected ? "border-accent bg-accent text-accent-ink" : "border-border-strong bg-surface",
-        selecting && "opacity-100",
-      )}
-    >
-      {selected ? <Check size={11} strokeWidth={3} /> : null}
-    </button>
+  // The favicon's 16px slot doubles as the selection check on hover or while selecting.
+  const selectSlot = (
+    <span className="select-slot" data-selecting={selecting}>
+      <span className="select-icon inline-flex"><Favicon url={bookmark.url} src={bookmark.faviconUrl} /></span>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={selected}
+        aria-label={selected ? "Deselect" : "Select"}
+        onClick={toggleSelect}
+        className={cn(
+          "select-check hover-reveal inline-flex items-center justify-center rounded-[2px] border transition-colors",
+          selected ? "border-accent bg-accent text-accent-ink" : "border-border-strong bg-surface",
+          selecting && "opacity-100",
+        )}
+      >
+        {selected ? <Check size={11} strokeWidth={3} /> : null}
+      </button>
+    </span>
   )
 
   // ---------------------------------------------------------------- list ----
@@ -179,16 +184,16 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
         data-id={bookmark.id}
         data-selected={selected}
         data-focused={focused}
+        data-editing={tagDraft !== null}
         onClick={openCard}
         onMouseEnter={onFocus}
         className={cn(
-          "group relative flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 transition-colors hover:bg-surface",
+          "group flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 transition-colors hover:bg-surface",
           focused && "bg-surface ring-1 ring-inset ring-border-strong",
           selected && "bg-accent-soft/40",
         )}
       >
-        {selectBox}
-        <Favicon url={bookmark.url} src={bookmark.faviconUrl} />
+        {selectSlot}
         <div className="flex min-w-0 flex-1 items-baseline gap-3">
           <a href={bookmark.url} onClick={(e) => e.preventDefault()} tabIndex={0} onFocus={onFocus} className={cn("truncate font-display text-[15px] font-medium outline-none", unread && "font-semibold")}>{bookmark.title}</a>
           <span className="hidden truncate font-mono text-[11px] text-ink-3 sm:inline">{domain}</span>
@@ -208,6 +213,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
       data-id={bookmark.id}
       data-selected={selected}
       data-focused={focused}
+      data-editing={tagDraft !== null}
       style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
       onClick={openCard}
       onMouseEnter={onFocus}
@@ -225,8 +231,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
       ) : null}
 
       <header className="mb-2 flex items-center gap-2">
-        {selectBox}
-        <Favicon url={bookmark.url} src={bookmark.faviconUrl} />
+        {selectSlot}
         <span className="meta truncate">{domain}</span>
         <span className="meta shrink-0 before:mx-1.5 before:content-['·']">{formatDate(bookmark.createdAt)}</span>
         <span className="ml-auto flex shrink-0 items-center gap-1">
