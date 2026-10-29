@@ -253,6 +253,20 @@ h1, h2, h3 {
     border-color: var(--accent);
   }
 
+  /* Action row: revealed on hover/focus where hover exists, always visible on touch. */
+  .card-actions {
+    opacity: 0;
+    transition: opacity 120ms var(--ease-enter);
+  }
+  .group:hover .card-actions,
+  .group:focus-within .card-actions,
+  .card-actions[data-focused="true"] {
+    opacity: 1;
+  }
+  @media (hover: none) {
+    .card-actions { opacity: 1; }
+  }
+
   .kbd {
     display: inline-flex;
     align-items: center;

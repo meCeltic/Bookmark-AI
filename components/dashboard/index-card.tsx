@@ -234,11 +234,9 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
         <p className="mt-1.5 font-mono text-[11px] text-ink-3">Couldn&rsquo;t read this page, kept the link.</p>
       ) : null}
 
-      <div className="mt-3 flex items-end justify-between gap-2">
-        {tags}
-      </div>
+      <div className="mt-3 pb-3">{tags}</div>
 
-      <footer className="mt-3 flex items-center gap-1 border-t border-border pt-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 data-[focused=true]:opacity-100" data-focused={focused}>
+      <footer className="card-actions mt-auto flex items-center gap-1 border-t border-border pt-1.5" data-focused={focused}>
         <span className="font-mono text-[10.5px] text-ink-3" title={aiLabel}>
           <Sparkles size={11} className={cn("mr-1 inline", bookmark.enrichment === "done" ? "text-accent" : "text-ink-3")} />
           {bookmark.enrichment === "done" ? "ai" : bookmark.enrichment === "fallback" ? "meta" : bookmark.enrichment === "failed" ? "no read" : "…"}
