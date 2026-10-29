@@ -78,3 +78,25 @@ describe("highlightRanges", () => {
     expect(highlightRanges("", [])).toEqual([])
   })
 })
+
+describe("editDistance", () => {
+  it("counts substitutions, insertions, deletions and transpositions as one each", async () => {
+    const { editDistance } = await import("./rank")
+    expect(editDistance("react", "react", 2)).toBe(0)
+    expect(editDistance("recat", "react", 2)).toBe(1)
+    expect(editDistance("reactt", "react", 2)).toBe(1)
+    expect(editDistance("rect", "react", 2)).toBe(1)
+    expect(editDistance("spring", "react", 2)).toBe(3)
+  })
+
+  it("does not let a typo query match unrelated long titles", async () => {
+    const { createSearchIndex, searchBookmarks } = await import("./rank")
+    const { makeBookmark } = await import("@/lib/test/fixtures")
+    const index = createSearchIndex([
+      makeBookmark({ title: "spring-projects/spring-boot", tags: ["java"] }),
+      makeBookmark({ title: "Server-Side Request Forgery Prevention Cheat Sheet", tags: ["security"] }),
+      makeBookmark({ title: "React hooks explained", tags: ["react"] }),
+    ])
+    expect(searchBookmarks(index, "recat").map((h) => h.bookmark.title)).toEqual(["React hooks explained"])
+  })
+})

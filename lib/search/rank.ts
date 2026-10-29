@@ -1,4 +1,3 @@
-import Fuse, { type FuseResult, type FuseResultMatch, type IFuseOptions } from "fuse.js"
 import type { Bookmark } from "@/lib/domain/bookmark"
 
 export interface SearchMatch {
@@ -13,80 +12,165 @@ export interface SearchHit {
   matches: SearchMatch[]
 }
 
+type Field = "title" | "tags" | "summary" | "description" | "url"
+
+interface Entry {
+  bookmark: Bookmark
+  /** Lower-cased field text, for substring matching. */
+  text: Record<Field, string>
+  /** Distinct words from title and tags, for typo matching. */
+  words: string[]
+}
+
 export interface SearchIndex {
-  fuse: Fuse<Bookmark>
-  bookmarks: Bookmark[]
+  entries: Entry[]
 }
 
 const DEFAULT_LIMIT = 50
 
-const FUSE_OPTIONS: IFuseOptions<Bookmark> = {
-  keys: [
-    { name: "title", weight: 0.45 },
-    { name: "tags", weight: 0.25 },
-    { name: "summary", weight: 0.15 },
-    { name: "description", weight: 0.1 },
-    { name: "url", weight: 0.05 },
-  ],
-  // Bitap counts a transposition as two edits, so "recat" vs "react" scores 0.4;
-  // 0.35 would reject that everyday typo.
-  threshold: 0.4,
-  ignoreLocation: true,
-  includeScore: true,
-  includeMatches: true,
-  minMatchCharLength: 2,
-}
+/**
+ * Ranking, in order:
+ *   1. the query is exactly one of the card's tags (an intent signal)
+ *   2. every query word appears as a substring of some field, ranked by field
+ *   3. a single-word query is within one or two typos of a title or tag word
+ *
+ * Typos use optimal string alignment distance (Levenshtein plus adjacent
+ * transposition) on words rather than whole fields, so "recat" finds "react"
+ * without lighting up every summary that happens to contain r, e, c, a, t.
+ */
+const FIELD_WEIGHT: Array<[Field, number]> = [
+  ["title", 1],
+  ["tags", 0.9],
+  ["summary", 0.6],
+  ["description", 0.5],
+  ["url", 0.4],
+]
+
+const wordsOf = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3)
 
 export const createSearchIndex = (bookmarks: Bookmark[]): SearchIndex => ({
-  fuse: new Fuse(bookmarks, FUSE_OPTIONS),
-  bookmarks,
+  entries: bookmarks.map((bookmark) => ({
+    bookmark,
+    text: {
+      title: bookmark.title.toLowerCase(),
+      tags: bookmark.tags.join(" ").toLowerCase(),
+      summary: (bookmark.summary ?? "").toLowerCase(),
+      description: (bookmark.description ?? "").toLowerCase(),
+      url: bookmark.url.toLowerCase(),
+    },
+    words: [...new Set([...wordsOf(bookmark.title), ...bookmark.tags.flatMap(wordsOf)])],
+  })),
 })
 
 const normalizeQuery = (query: string): string => query.trim().toLowerCase()
 
-const toMatches = (matches: readonly FuseResultMatch[] | undefined): SearchMatch[] =>
-  (matches ?? [])
-    .filter((m): m is FuseResultMatch & { key: string } => typeof m.key === "string")
-    .map((m) => ({ key: m.key, indices: m.indices.map(([s, e]) => [s, e] as [number, number]) }))
+/** Every query word must appear in some field; the score follows the best field hit. */
+function substringHit(entry: Entry, words: string[]): SearchHit | null {
+  let best = 0
+  const matches: SearchMatch[] = []
+  for (const word of words) {
+    let found = false
+    for (const [field, weight] of FIELD_WEIGHT) {
+      const at = entry.text[field].indexOf(word)
+      if (at === -1) continue
+      found = true
+      best = Math.max(best, weight * (at === 0 ? 1 : 0.9))
+      matches.push({ key: field, indices: [[at, at + word.length - 1]] })
+      break
+    }
+    if (!found) return null
+  }
+  return { bookmark: entry.bookmark, score: 0.35 + 0.65 * best, matches }
+}
 
-const toHit = (result: FuseResult<Bookmark>): SearchHit => ({
-  bookmark: result.item,
-  score: 1 - (result.score ?? 1),
-  matches: toMatches(result.matches),
-})
+/** Optimal string alignment distance, capped: returns max + 1 as soon as it is exceeded. */
+export function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1
+  const rows: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
+    Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+  )
+  for (let i = 1; i <= a.length; i++) {
+    let rowMin = Infinity
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      let value = Math.min(rows[i - 1]![j]! + 1, rows[i]![j - 1]! + 1, rows[i - 1]![j - 1]! + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        value = Math.min(value, rows[i - 2]![j - 2]! + 1)
+      }
+      rows[i]![j] = value
+      rowMin = Math.min(rowMin, value)
+    }
+    if (rowMin > max) return max + 1
+  }
+  return rows[a.length]![b.length]!
+}
 
-const exactTagHit = (bookmark: Bookmark, tag: string): SearchHit => ({
-  bookmark,
-  score: 1,
-  matches: [{ key: "tags", indices: [[0, tag.length - 1]] }],
-})
+const typoBudget = (word: string): number => (word.length >= 8 ? 2 : word.length >= 4 ? 1 : 0)
 
-export const searchBookmarks = (
-  index: SearchIndex,
-  query: string,
-  limit: number = DEFAULT_LIMIT,
-): SearchHit[] => {
+function fuzzyHit(entry: Entry, word: string): SearchHit | null {
+  const budget = typoBudget(word)
+  if (budget === 0) return null
+  let bestDistance = budget + 1
+  let bestWord = ""
+  for (const candidate of entry.words) {
+    const d = editDistance(word, candidate, budget)
+    if (d < bestDistance) {
+      bestDistance = d
+      bestWord = candidate
+    }
+  }
+  if (bestDistance > budget) return null
+  const field: Field = entry.bookmark.tags.includes(bestWord) ? "tags" : "title"
+  const at = entry.text[field].indexOf(bestWord)
+  return {
+    bookmark: entry.bookmark,
+    score: 0.3 * (1 - bestDistance / (budget + 1)),
+    matches: at >= 0 ? [{ key: field, indices: [[at, at + bestWord.length - 1]] }] : [],
+  }
+}
+
+export const searchBookmarks = (index: SearchIndex, query: string, limit: number = DEFAULT_LIMIT): SearchHit[] => {
   const q = normalizeQuery(query)
   if (q === "") return []
+  const words = q.split(/\s+/).filter(Boolean)
 
-  // A query that is exactly one of a bookmark's tags is an intent signal, not a
-  // fuzzy hit, so those bookmarks are pinned to the top regardless of Fuse score.
-  const exact = index.bookmarks.filter((b) => b.tags.includes(q)).map((b) => exactTagHit(b, q))
-  const exactIds = new Set(exact.map((h) => h.bookmark.id))
+  const exact: SearchHit[] = []
+  const plain: SearchHit[] = []
+  const seen = new Set<string>()
 
-  const fuzzy = index.fuse
-    .search(q)
-    .map(toHit)
-    .filter((h) => !exactIds.has(h.bookmark.id))
+  for (const entry of index.entries) {
+    if (entry.bookmark.tags.includes(q)) {
+      exact.push({ bookmark: entry.bookmark, score: 1, matches: [{ key: "tags", indices: [[0, q.length - 1]] }] })
+      seen.add(entry.bookmark.id)
+      continue
+    }
+    const hit = substringHit(entry, words)
+    if (hit) {
+      plain.push(hit)
+      seen.add(entry.bookmark.id)
+    }
+  }
+  plain.sort((a, b) => b.score - a.score)
 
-  return [...exact, ...fuzzy].slice(0, limit)
+  const fuzzy: SearchHit[] = []
+  if (words.length === 1) {
+    for (const entry of index.entries) {
+      if (seen.has(entry.bookmark.id)) continue
+      const hit = fuzzyHit(entry, words[0]!)
+      if (hit) fuzzy.push(hit)
+    }
+    fuzzy.sort((a, b) => b.score - a.score)
+  }
+
+  return [...exact, ...plain, ...fuzzy].slice(0, limit)
 }
 
 /** Splits text into alternating plain/highlighted segments from inclusive index pairs. */
-export const highlightRanges = (
-  text: string,
-  indices: [number, number][],
-): Array<{ text: string; hit: boolean }> => {
+export const highlightRanges = (text: string, indices: [number, number][]): Array<{ text: string; hit: boolean }> => {
   const ranges = [...indices]
     .map(([s, e]) => [Math.max(0, s), Math.min(text.length - 1, e)] as [number, number])
     .filter(([s, e]) => s <= e)
