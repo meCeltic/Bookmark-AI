@@ -7,8 +7,7 @@ import "./globals.css"
 const fraunces = Fraunces({
   subsets: ["latin"],
   variable: "--font-fraunces",
-  axes: ["opsz", "WONK"],
-  weight: ["400", "500", "600", "700"],
+  axes: ["opsz", "WONK", "SOFT"],
   style: ["normal", "italic"],
   display: "swap",
 })
