@@ -142,18 +142,20 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
       {counts.tags.length ? (
         <>
           <div className="mt-5 px-4"><span className="meta">Tags</span></div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5 px-4">
-            {counts.tags.slice(0, 24).map(({ tag, count }) => {
+          <div className="mt-1 px-2">
+            {counts.tags.slice(0, 16).map(({ tag, count }) => {
               const active = state.tags.includes(tag)
               return (
                 <button
                   key={tag}
                   type="button"
-                  className={cn("stamp", !active && "stamp-quiet")}
-                  data-active={active}
+                  className={cn("flex w-full items-center gap-2 rounded-[2px] px-2 py-1 text-left font-mono text-[12px] transition-colors hover:bg-surface", active ? "text-accent" : "text-ink-2")}
+                  aria-pressed={active}
                   onClick={() => api.dispatch({ type: "tags", tags: active ? state.tags.filter((t) => t !== tag) : [...state.tags, tag] })}
                 >
-                  {tag}<span className="opacity-60">{count}</span>
+                  <span className={cn("w-2 text-center", active ? "text-accent" : "text-ink-3")}>{active ? "×" : "#"}</span>
+                  <span className="truncate">{tag}</span>
+                  <span className="ml-auto text-[11px] text-ink-3">{count}</span>
                 </button>
               )
             })}

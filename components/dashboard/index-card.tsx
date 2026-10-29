@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, ArchiveRestore, BookOpen, Check, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Sparkles, Star, Tag, Trash2 } from "lucide-react"
+import { Archive, ArchiveRestore, BookOpen, Check, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
 import { memo, useState, type KeyboardEvent, type MouseEvent } from "react"
 import { toast } from "sonner"
 import type { Bookmark } from "@/lib/domain/bookmark"
@@ -145,7 +145,7 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
       aria-label={selected ? "Deselect" : "Select"}
       onClick={toggleSelect}
       className={cn(
-        "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border transition-colors",
+        "select-tab inline-flex items-center justify-center rounded-[2px] border transition-colors",
         selected ? "border-accent bg-accent text-accent-ink" : "border-border-strong bg-surface opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
         selecting && "opacity-100",
       )}
@@ -166,7 +166,7 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
         onClick={openCard}
         onMouseEnter={onFocus}
         className={cn(
-          "group flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 transition-colors hover:bg-surface",
+          "group relative flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 transition-colors hover:bg-surface",
           focused && "bg-surface ring-1 ring-inset ring-border-strong",
           selected && "bg-accent-soft/40",
         )}
@@ -234,15 +234,14 @@ export const IndexCard = memo(function IndexCard({ bookmark, layout, index, focu
         <p className="mt-1.5 font-mono text-[11px] text-ink-3">Couldn&rsquo;t read this page, kept the link.</p>
       ) : null}
 
-      <div className="mt-3 pb-3">{tags}</div>
+      <div className="mt-3 pb-2.5">{tags}</div>
 
-      <footer className="card-actions mt-auto flex items-center gap-1 border-t border-border pt-1.5" data-focused={focused}>
-        <span className="font-mono text-[10.5px] text-ink-3" title={aiLabel}>
-          <Sparkles size={11} className={cn("mr-1 inline", bookmark.enrichment === "done" ? "text-accent" : "text-ink-3")} />
-          {bookmark.enrichment === "done" ? "ai" : bookmark.enrichment === "fallback" ? "meta" : bookmark.enrichment === "failed" ? "no read" : "…"}
-          {bookmark.readingMinutes ? ` · ${bookmark.readingMinutes} min` : ""}
+      <footer className="card-actions mt-auto flex h-8 items-center gap-1 border-t border-border" data-focused={focused}>
+        <span className={cn("font-mono text-[10.5px] uppercase tracking-[0.06em]", bookmark.enrichment === "done" ? "text-accent" : "text-ink-3")} title={aiLabel}>
+          {bookmark.enrichment === "done" ? "ai summary" : bookmark.enrichment === "fallback" ? "page meta" : bookmark.enrichment === "failed" ? "unread page" : "reading"}
+          {bookmark.readingMinutes ? <span className="text-ink-3"> · {bookmark.readingMinutes} min</span> : null}
         </span>
-        <span className="ml-auto flex items-center">
+        <span className="card-buttons ml-auto flex items-center">
           <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Copy link" aria-label="Copy link" onClick={(e) => { e.stopPropagation(); void copy() }}><Copy size={14} /></button>
           <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Favourite" aria-label="Favourite" onClick={(e) => { e.stopPropagation(); void api.patch(bookmark.id, { favourite: !bookmark.favourite }) }}>
             <Star size={14} className={cn(bookmark.favourite && "fill-accent text-accent")} />

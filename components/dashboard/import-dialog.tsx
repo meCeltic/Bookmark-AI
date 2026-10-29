@@ -24,7 +24,7 @@ export function ImportDialog({ open, onOpenChange }: Props) {
     const text = await file.text()
     const parsed = parseImportFile(text)
     if (parsed.kind === "unknown" || parsed.items.length === 0) {
-      toast.error("That file has no bookmarks I can read. Export from your browser as HTML.")
+      toast.error("No bookmarks found in that file. Browsers export them as an HTML file.")
       return
     }
     setKind(parsed.kind === "netscape" ? "browser export" : "Bookmark-AI export")

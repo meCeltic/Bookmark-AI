@@ -75,7 +75,7 @@ export default function Home() {
           </div>
           <div className="order-1 md:order-2">
             <p className="meta">Finding it again</p>
-            <h2 className="mt-3 font-display text-[30px] font-medium leading-tight">Search forgives typos. The keyboard does the rest.</h2>
+            <h2 className="mt-3 font-display text-[30px] font-medium leading-tight">Type the word you remember.</h2>
             <p className="mt-4 max-w-[48ch] text-ink-2">
               One input filters as you type and flips into Save mode the moment it sees a link. <kbd className="kbd">⌘K</kbd> opens the same drawer as a palette. <kbd className="kbd">j</kbd> and <kbd className="kbd">k</kbd> walk the cards; <kbd className="kbd">f</kbd>, <kbd className="kbd">e</kbd> and <kbd className="kbd">⌫</kbd> favourite, archive and delete, with undo. Import your browser&rsquo;s bookmarks file and folders become collections; export back to HTML whenever you like.
             </p>
@@ -91,11 +91,11 @@ export default function Home() {
         <section className="border-t border-border py-16 md:py-24">
           <p className="meta">Under the hood</p>
           <h2 className="mt-3 font-display text-[30px] font-medium leading-tight">Built like a backend, dressed like a desk.</h2>
-          <div className="mt-8 grid gap-6 md:grid-cols-3">
+          <dl className="mt-8 divide-y divide-border border-y border-border-strong">
             <Note title="One repository interface, three implementations" body="The dashboard talks to a BookmarkRepository. Demo mode gets a localStorage implementation; signed-in users get Postgres behind server actions. Same Zod types, same contract tests." />
             <Note title="Postgres does the hard parts" body="Row-level security on every table, a unique index on the canonical URL, a generated tsvector with weighted fields, a trigram index for typos, and two small SQL functions for search and tag renames." />
             <Note title="Untrusted in, validated out" body="URLs, import files, model output and localStorage are all parsed through schemas at the boundary. Route handlers return typed errors with proper status codes and Retry-After." />
-          </div>
+          </dl>
         </section>
       </main>
 
@@ -131,9 +131,9 @@ function Row({ label, hint, active }: { label: string; hint?: string; active?: b
 
 function Note({ title, body }: { title: string; body: string }) {
   return (
-    <div className="border-t border-border-strong pt-4">
-      <h3 className="font-display text-[18px] font-semibold leading-snug">{title}</h3>
-      <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{body}</p>
+    <div className="grid gap-2 py-5 md:grid-cols-[1fr_2fr] md:gap-10">
+      <dt className="font-display text-[19px] font-semibold leading-snug">{title}</dt>
+      <dd className="text-[15px] leading-relaxed text-ink-2">{body}</dd>
     </div>
   )
 }
