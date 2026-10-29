@@ -5,6 +5,7 @@ import { enrichUrl } from "@/lib/enrich/pipeline"
 import { clientKey, limiterFor } from "@/lib/ratelimit"
 import { getSessionUser } from "@/lib/supabase/server"
 import { normalizeUrl } from "@/lib/url/normalize"
+import { logger, requestId } from "@/lib/log"
 
 export const runtime = "nodejs"
 
@@ -18,9 +19,11 @@ const bodySchema = z.object({ url: z.string().min(1).max(2048) })
  */
 export async function POST(request: Request) {
   const user = await getSessionUser()
+  const log = logger({ route: "enrich", requestId: requestId(request.headers), user: user?.id ?? "anon" })
   const limiter = limiterFor("enrich", user ? { capacity: 30, windowMs: 60_000 } : { capacity: 12, windowMs: 60_000 })
   const verdict = limiter.take(clientKey(request.headers, user?.id))
   if (!verdict.allowed) {
+    log.warn("rate limited", { retryAfter: verdict.retryAfterSeconds })
     return errorResponse(
       { code: "RATE_LIMITED", message: "Too many pages at once. Try again shortly." },
       { "Retry-After": String(verdict.retryAfterSeconds) },
@@ -32,6 +35,10 @@ export async function POST(request: Request) {
   if (!url) return errorResponse({ code: "VALIDATION", message: "That does not look like a web address." })
 
   const result = await enrichUrl(url)
-  if (!result.ok) return errorResponse(result.error)
+  if (!result.ok) {
+    log.warn("enrich refused", { code: result.error.code, host: new URL(url).hostname })
+    return errorResponse(result.error)
+  }
+  log.info("enriched", { host: new URL(url).hostname, source: result.data.source })
   return NextResponse.json(result.data, { headers: { "Cache-Control": "no-store" } })
 }

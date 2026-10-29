@@ -5,6 +5,7 @@ import { errorResponse, readJsonBody } from "@/lib/http"
 import { clientKey, limiterFor } from "@/lib/ratelimit"
 import { getSessionUser } from "@/lib/supabase/server"
 import { safeFetch } from "@/lib/url/ssrf-guard"
+import { logger, requestId } from "@/lib/log"
 
 export const runtime = "nodejs"
 
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
   const limiter = limiterFor("health", { capacity: 10, windowMs: 60_000 })
   const verdict = limiter.take(clientKey(request.headers, user?.id))
   if (!verdict.allowed) {
+    logger({ route: "health", requestId: requestId(request.headers) }).warn("rate limited", { retryAfter: verdict.retryAfterSeconds })
     return errorResponse(
       { code: "RATE_LIMITED", message: "Checked a lot of links recently. Try again in a minute." },
       { "Retry-After": String(verdict.retryAfterSeconds) },

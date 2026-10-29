@@ -25,3 +25,22 @@ describe("RateLimiter", () => {
     expect(limiter.take("a").allowed).toBe(true)
   })
 })
+
+describe("clientKey and limiterFor", () => {
+  it("keys signed-in callers by user and anonymous ones by the platform ip headers", async () => {
+    const { clientKey } = await import("./ratelimit")
+    expect(clientKey(new Headers(), "u1")).toBe("user:u1")
+    expect(clientKey(new Headers({ "x-real-ip": "9.9.9.9", "x-forwarded-for": "1.1.1.1, 2.2.2.2" }))).toBe("ip:9.9.9.9")
+    // Without x-real-ip, the last hop is the one the nearest proxy appended.
+    expect(clientKey(new Headers({ "x-forwarded-for": "1.1.1.1, 2.2.2.2" }))).toBe("ip:2.2.2.2")
+    expect(clientKey(new Headers())).toBe("ip:unknown")
+  })
+
+  it("keeps one limiter per route and tier", async () => {
+    const { limiterFor } = await import("./ratelimit")
+    const a = limiterFor("t", { capacity: 1, windowMs: 1000 })
+    const b = limiterFor("t", { capacity: 5, windowMs: 1000 })
+    expect(a).not.toBe(b)
+    expect(limiterFor("t", { capacity: 1, windowMs: 1000 })).toBe(a)
+  })
+})

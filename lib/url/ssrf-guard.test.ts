@@ -257,6 +257,13 @@ describe("safeFetch", () => {
     expect(headers.Accept).toBe("text/plain")
   })
 
+  it("refuses a redirect from https down to http", async () => {
+    fetchMock.mockResolvedValueOnce(redirect(301, "http://example.com/plain"))
+    const result = await safeFetch("https://example.com/a")
+    expect(result).toMatchObject({ ok: false, error: { code: "BLOCKED_URL" } })
+    expect(requestedUrls()).toEqual(["https://example.com/a"])
+  })
+
   it("follows two redirects, re-validating each hop", async () => {
     fetchMock
       .mockResolvedValueOnce(redirect(301, "https://example.com/b"))

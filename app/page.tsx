@@ -114,7 +114,7 @@ function Stage({ n, title, body }: { n: string; title: string; body: string }) {
       <span className="font-mono text-[12px] text-accent">{n}</span>
       <div>
         <h3 className="font-display text-[17px] font-semibold">{title}</h3>
-        <p className="mt-1 font-mono text-[11.5px] leading-relaxed text-ink-2">{body}</p>
+        <p className="mt-1 font-mono text-[12.5px] leading-relaxed text-ink-2">{body}</p>
       </div>
     </li>
   )

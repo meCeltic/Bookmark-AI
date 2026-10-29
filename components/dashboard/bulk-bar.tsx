@@ -13,7 +13,7 @@ export function BulkBar({ onExport }: { onExport: () => void }) {
   const ids = [...selected]
 
   return (
-    <div className="card anim-pop fixed bottom-4 left-1/2 z-30 flex max-w-[calc(100vw-24px)] -translate-x-1/2 flex-wrap items-center justify-center gap-0.5 whitespace-nowrap px-2 py-1.5 shadow-card sm:flex-nowrap">
+    <div className="card anim-pop fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded-none border-x-0 border-b-0 px-2 py-2 shadow-card sm:inset-x-auto sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2 sm:rounded-[2px] sm:border sm:py-1.5">
       <span className="px-2 font-mono text-[12px]">{ids.length} selected</span>
       <button type="button" className="btn btn-ghost btn-sm" title="Favourite" onClick={() => api.patchMany(ids, { favourite: true }, "favourited")}><Star size={14} /><span className="hidden sm:inline">Favourite</span></button>
       <button type="button" className="btn btn-ghost btn-sm" title="Mark read" onClick={() => api.patchMany(ids, { readAt: new Date().toISOString() }, "marked read")}><BookOpen size={14} /><span className="hidden sm:inline">Read</span></button>

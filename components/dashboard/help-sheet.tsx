@@ -4,7 +4,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 const ROWS: Array<[string, string]> = [
   ["/", "Focus search"],
-  ["⌘ K", "Command palette"],
+  ["⌘K", "Command palette"],
   ["j / k", "Next / previous card"],
   ["↵", "Open card"],
   ["f", "Favourite"],
@@ -12,7 +12,7 @@ const ROWS: Array<[string, string]> = [
   ["e", "Archive / restore"],
   ["t", "Add tag (from the card menu)"],
   ["x", "Select card"],
-  ["⇧ A", "Select all"],
+  ["⇧A", "Select all"],
   ["c", "Copy link"],
   ["⌫", "Delete (undoable)"],
   ["g / l", "Grid / list"],

@@ -1,47 +1,43 @@
-# Bookmark-AI — Design Score (post-fix)
+# Bookmark-AI — Design Score (rescore after commit 858f609)
 
-Playwright at 1440 and 390, both themes, reduced motion, computed-style sweeps on all four routes plus every interaction state. (The round "N" badge is the Next.js dev indicator.)
+Playwright at 1440 (light + dark) and 390 touch (`hover: none` true), grid and list, computed styles and bounding boxes on every changed control, hero sampled every ~500ms for 12.5s. Previous: 8.3 / 8.7.
 
 ## Scores
 
-**Visual design: 8.3 / 10** (was 2.5, review 7.5). The desk direction is consistent on every surface: paper tones, hairlines, one oxblood, three typefaces, 2px radii, no gradients, blur, resting shadow or lift. The review's HIGHs are verified gone: dialogs `position: fixed` at `top: 126px` with dimmed overlay; inputs focus with an accent rule only (`outline: none`); `AI SUMMARY · 12 MIN` stays at rest with icons revealing on hover; `--text-3` is `#857d6f` / `#7d7566`; sidebar tags and "Under the hood" are ruled rows. What keeps it under 9: the touch layout is cluttered, the bulk bar wraps, the help sheet opens with a loud focus ring, and the hero card idles empty.
+**Visual design: 8.8 / 10** (was 8.3). Touch is now as restrained as desktop: a card at rest on 390px shows favicon, title, summary, stamps and four 36×36 buttons, nothing else. The selection check lives in the favicon's 16px slot (icon → 0, check → 1 on hover; box fully inside the card border in grid and list). The stamp × is a 20px inline tail that squares the stamp's right corners, no overlap in either theme. The bulk bar is one row at 1440. Landing stages are ruled rows. Two things keep it under 9: the hero still half-empties between cycles, and the mobile bulk bar is a 195×125 floating icon blob.
 
-**Passes as human-designed: 8.7 / 10** (review 8). The split auth page, mono call-number line, ⋯ menu with inline key hints, undo toasts and "No card matches *zzzqqq*." all read as decisions. The last tells are small: a `⌘` `K` pair of kbd boxes, an accent hyphen in the wordmark, and × remove badges pinned on every tag on touch.
+**Passes as human-designed: 9.0 / 10** (was 8.7). `⌘K` is one kbd, the wordmark hyphen is plain, the ⋯ menu gained "Select x" so touch has a route into bulk mode. The only tell left is the mid-cycle hero frame, which looks like a loading bug rather than a decision.
 
-## 15-point checklist
+## Verified (each with a probe)
 
-| # | Check | Result | Evidence |
-|---|---|---|---|
-| 1 | No `v0`/`lovable`/`generator` meta | PASS | HTML grep empty |
-| 2 | No linear gradient | PASS | 0 computed gradients, 3 routes, both themes |
-| 3 | No `backdrop-filter` | PASS | 0 hits |
-| 4 | No `gradient-text`/`glass-effect`/`hover-lift` | PASS | 0 in rendered classes |
-| 5 | Three typefaces on dashboard | PASS | all three rendering |
-| 6 | Hero is a working component | PASS | `LiveCard` types `rauno.me/craft/…`, resolves favicon, 14 MIN, summary, stamps |
-| 7 | No 3-col icon+heading+sentence grid | PASS | "Under the hood" is three ruled label/paragraph rows |
-| 8 | Radius ≤ 4px, tags only pills | PASS | only unread dot and tag × are round |
-| 9 | No resting shadow, hover never translates | PASS | `box-shadow: none`; hovered `transform: matrix(1,0,0,1,0,0)` |
-| 10 | One accent, headings uncoloured | PASS | all h1–h3 `#1c1a17` / `#ece7dc` |
-| 11 | One input searches and saves | PASS | `https://example.com/some-page` → accent rule + "Save ↵" |
-| 12 | Card heights vary | PASS | 197 / 217 / 241 px across the 22 demo cards |
-| 13 | Entities decoded | PASS | "Git branches: intuition & reality", "Don't Scale" |
-| 14 | Reduced motion kills stagger/transform | PASS | `animation-name: none`, durations `1e-06s` |
-| 15 | Delete undoable, no permanent red button | PASS | Delete in ⋯ and bulk bar, toast with Undo |
+| Claim | Result | Evidence |
+|---|---|---|
+| Touch stamps 26px | PASS | `.stamp` 66×26, 11.5px mono |
+| Touch icon buttons 36px | PASS | Copy / Favourite / Add tag / More all 36×36, opacity 1 |
+| Check and × hidden on touch at rest | PASS | check opacity 0, `.stamp-x` display none |
+| ⋯ menu has Select | PASS | items: Open, Copy link, **Select x**, Favourite… |
+| Select via menu reveals checks | PASS | check 1 / icon 0 on every card; bulk bar appears |
+| Tag-edit shows × tails on touch | PASS | `data-editing=true`, × 29×26 beside each stamp, "tag, enter" input |
+| Hero starts on a finished card | PASS | at +476ms: PostgreSQL title, 3 stamps, input filled |
+| Previous card stays while next URL types | PARTIAL | title and header stay; summary and stamps vanish (see 1) |
+| Bulk bar nowrap on sm+ | PASS | 778×43, `flex-wrap: nowrap`, one row |
+| Help sheet no autofocus on × | PASS | active element unchanged on open |
+| Stamp × inline tail | PASS | stamp 55×20 + x 18×20, radius `0 999px 999px 0`, border-right 0 on stamp |
+| Check in favicon slot, nothing protrudes | PASS | grid 267,171 inside 251,154; list check 16px inside the 44px row |
+| Zero-size favicon → letter | PASS | 0 blank imgs visible, 5 letter fallbacks |
+| Landing stages ruled rows | PASS | `li` transparent, `py-4`, `divide-y` + `border-y` on the ol |
+| ⌘K one kbd | PASS | `['⌘K']` |
+| Wordmark hyphen plain | PASS | innerHTML `Bookmark-AI` |
+| No console errors | PASS | 0 across all runs |
 
-## Remaining issues, ranked (checklist 15/15)
+## Remaining issues, ranked
 
-1. **Touch layout is cluttered and under-sized.** At 390px every card shows a 16×16 checkbox at the edge and a 15×15 × badge on the corner of every stamp, so a three-tag card carries five extra controls at rest; stamps 20px tall, icon buttons 26×26 (review `MED-1` not applied). Fix: under `@media (hover: none)` hide `.stamp .remove` entirely (removal already lives in ⋯ → tags), keep the checkbox hidden until a long-press or the bulk bar is open, `.stamp { height: 24px; padding: 0 9px }`, card icon buttons `h-9 w-9 sm:h-7 sm:w-7`.
-2. **Hero card idles empty.** On load and between cycles the card shows a lone "…" for 1–2s with ~90px of blank paper under the tags, so the first paint of the page's strongest element is an empty box (`s-landing.png`). Fix in `live-card.tsx`: start typing at 150ms; keep the previous card until the next URL's first character; `min-height` = tallest sample, not 290px.
-3. **Bulk bar wraps to two rows at 1440px.** "Delete ×" lands on a second line. Fix: `whitespace-nowrap`, drop `max-w`, move Export and Check into an overflow ⋯.
-4. **Help sheet opens with a 2px accent ring on the × button**. Fix: `onOpenAutoFocus={(e) => e.preventDefault()}` on the sheet content, or focus the first row.
-5. **Tag × badge overlaps the stamp text on hover** ("essay ×" collides). Fix: render × as a trailing glyph inside the stamp (`padding-right: 4px`, `opacity 0 → 1`), not an absolute `-right-1.5 -top-1.5` bubble.
-6. **Selection check protrudes 8px into the gutter** outside the card border and, in list view, a half-clipped checkbox shows on the hovered row. Fix: `left-3 top-3` inside the card, swapping with the favicon in the same slot.
-7. **Letter-favicon fallback is missing when the image 404s** (joelonsoftware.com, ai.google.dev show a blank 16px slot). Fix: `onError` → swap to the existing letter square.
-8. **Landing stage cards** still four bordered boxes, 11.5px mono, 90px of air under the left column. Fix: `border-t` rows, body 12.5px.
-9. **Small tells**: `⌘` `K` as two kbd boxes (make one `⌘K`); wordmark hyphen in accent (set to `--text-3`).
+1. **Hero half-empties while the next URL types (≈1.2s every cycle).** `play()` sets `stage = "typing"` before `begin()`, and the summary/tags guards in the JSX only allow `summary | tags | done`, so the card drops to header + title with ~110px of blank paper (`v2-hero-5200.png`; the full-page landing shot caught this frame). Fix in `components/landing/live-card.tsx`: add `"typing"` to both guards — `{(stage === "summary" || stage === "tags" || stage === "done" || stage === "typing") && …}` and the same for the tags block — so the finished card persists until `begin()` resets it.
+2. **Mobile bulk bar is a floating 195×125 icon cluster** (3 rows, 9 unlabeled icons) overlapping card text. Fix in `bulk-bar.tsx`: below `sm`, make it a full-width bottom strip (`inset-x-0 bottom-0 translate-x-0 rounded-none border-x-0`), one row of `N selected · Favourite · Read · Tag · ⋯ · ×` with Move/Check/Export/Archive/Delete inside an overflow menu.
+3. **Help sheet leaves an accent focus ring on the card behind the overlay** when opened from a focused check (`v1-help.png`, supabase card). Fix: in `onOpenAutoFocus` call `(document.activeElement as HTMLElement)?.blur()` after `preventDefault()`, or focus the sheet's `<dl>` with `tabIndex={-1}`.
+4. **Help sheet still renders `⌘` `K` as two kbd boxes** while the top bar now shows `⌘K`. Fix: in `help-sheet.tsx` ROWS, render combos as one kbd (`⌘K`, `⇧A`) and keep `/`-separated alternates (`j / k`) as they are.
+5. **Landing stage body is 11.5px mono** at 1440 (issue 8's 12.5px not applied). Fix: `text-[12.5px]` on the `Stage` paragraph.
 
-## The three changes that move the score most
+## Would a design director ship it?
 
-1. **Touch pass (issue 1).** Mobile undoes the restraint the desktop earns. ~+0.5.
-2. **Hero never empty (issue 2).** An empty box in the first second costs more than any other frame. ~+0.3.
-3. **Bulk bar + help-sheet focus + stamp × (issues 3–5).** Interaction-state polish a director notices in the first minute. ~+0.3, which clears 9.
+Yes, with issue 1 fixed first — it is a 4-line guard change and it is the frame most visitors will see first. Issues 2–5 can follow in a mobile polish pass; none of them undermines the direction, which now holds on every surface, both themes, and touch.

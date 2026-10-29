@@ -20,9 +20,13 @@ import { materialize, uniqueTags } from "./shared"
 
 type Row = Record<string, unknown>
 
-/** Every column except the generated search vector, which only Postgres needs. */
-const COLUMNS =
+/**
+ * Explicit column lists: bookmarks skip the generated search vector, which only
+ * Postgres needs. lib/repo/columns.test.ts checks both against the migration.
+ */
+export const BOOKMARK_COLUMNS =
   "id,user_id,collection_id,url,url_normalized,title,description,summary,tags,category,favicon_url,image_url,favourite,read_at,archived_at,enrichment,reading_minutes,health,health_checked_at,last_opened_at,created_at,updated_at"
+export const COLLECTION_COLUMNS = "id,user_id,name,position,created_at"
 
 const UNIQUE_VIOLATION = "23505"
 
@@ -129,14 +133,14 @@ export class SupabaseRepository implements BookmarkRepository {
   async listBookmarks(): Promise<Bookmark[]> {
     const { data, error } = await this.db
       .from("bookmarks")
-      .select(COLUMNS)
+      .select(BOOKMARK_COLUMNS)
       .order("created_at", { ascending: false })
     if (error) throw new Error(error.message)
     return (data as Row[]).map(rowToBookmark)
   }
 
   async getBookmark(id: string): Promise<Bookmark | null> {
-    const { data } = await this.db.from("bookmarks").select(COLUMNS).eq("id", id).maybeSingle()
+    const { data } = await this.db.from("bookmarks").select(BOOKMARK_COLUMNS).eq("id", id).maybeSingle()
     return data ? rowToBookmark(data as Row) : null
   }
 
@@ -145,7 +149,7 @@ export class SupabaseRepository implements BookmarkRepository {
     const { data, error } = await this.db
       .from("bookmarks")
       .insert(bookmarkToRow(bookmark, this.userId))
-      .select(COLUMNS)
+      .select(BOOKMARK_COLUMNS)
       .single()
     if (error?.code === UNIQUE_VIOLATION) {
       const { data: existing } = await this.db
@@ -167,7 +171,7 @@ export class SupabaseRepository implements BookmarkRepository {
       .from("bookmarks")
       .update(patchToRow(patch))
       .eq("id", id)
-      .select(COLUMNS)
+      .select(BOOKMARK_COLUMNS)
       .maybeSingle()
     if (error) return failInternal(error)
     if (!data) return fail("NOT_FOUND", "That bookmark is gone.")
@@ -183,7 +187,7 @@ export class SupabaseRepository implements BookmarkRepository {
 
   async updateBookmarks(ids: string[], patch: BookmarkPatch): Promise<Result<Bookmark[]>> {
     if (!ids.length) return ok([])
-    const { data, error } = await this.db.from("bookmarks").update(patchToRow(patch)).in("id", ids).select(COLUMNS)
+    const { data, error } = await this.db.from("bookmarks").update(patchToRow(patch)).in("id", ids).select(BOOKMARK_COLUMNS)
     if (error) return failInternal(error)
     return ok((data as Row[]).map(rowToBookmark))
   }
@@ -206,14 +210,14 @@ export class SupabaseRepository implements BookmarkRepository {
     const { data, error } = await this.db
       .from("bookmarks")
       .upsert(rows, { onConflict: "user_id,url_normalized", ignoreDuplicates: true })
-      .select(COLUMNS)
+      .select(BOOKMARK_COLUMNS)
     if (error) return failInternal(error)
     const created = (data as Row[]).map(rowToBookmark)
     return ok({ created, skipped: inputs.length - created.length })
   }
 
   async listCollections(): Promise<Collection[]> {
-    const { data, error } = await this.db.from("collections").select("*").order("position")
+    const { data, error } = await this.db.from("collections").select(COLLECTION_COLUMNS).order("position")
     if (error) throw new Error(error.message)
     return (data as Row[]).map(rowToCollection)
   }
@@ -225,7 +229,7 @@ export class SupabaseRepository implements BookmarkRepository {
     const { data, error } = await this.db
       .from("collections")
       .insert({ user_id: this.userId, name: clean, position: ((last as Row | null)?.position as number | undefined ?? -1) + 1 })
-      .select(COLUMNS)
+      .select(COLLECTION_COLUMNS)
       .single()
     if (error?.code === UNIQUE_VIOLATION) return fail("DUPLICATE", `"${clean}" already exists.`)
     if (error) return failInternal(error)
@@ -239,7 +243,7 @@ export class SupabaseRepository implements BookmarkRepository {
       .from("collections")
       .update({ name: clean })
       .eq("id", id)
-      .select(COLUMNS)
+      .select(COLLECTION_COLUMNS)
       .maybeSingle()
     if (error?.code === UNIQUE_VIOLATION) return fail("DUPLICATE", `"${clean}" already exists.`)
     if (error) return failInternal(error)

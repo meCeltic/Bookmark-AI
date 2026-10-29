@@ -173,10 +173,10 @@ export function LiveCard() {
             <h3 className="mt-2 font-display text-[19px] font-semibold leading-snug">
               {result ? result.title : <span className="caret text-ink-3">{domainOf(url)}</span>}
             </h3>
-            {stage === "summary" || stage === "tags" || stage === "done" ? (
+            {stage === "summary" || stage === "tags" || stage === "done" || stage === "typing" ? (
               <p className={cn("mt-1.5 text-[14px] leading-[1.45] text-ink-2", stage === "summary" && "caret")}>{shownSummary}</p>
             ) : null}
-            {(stage === "tags" || stage === "done") && result ? (
+            {(stage === "tags" || stage === "done" || stage === "typing") && result ? (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {result.tags.slice(0, shownTags).map((t) => <span key={t} className="stamp anim-stamp">{t}</span>)}
                 {result.tags.length === 0 ? <span className="font-mono text-[10.5px] text-ink-3">no tags without an ai key</span> : null}
