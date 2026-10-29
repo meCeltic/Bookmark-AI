@@ -14,6 +14,7 @@ import {
 import { fail, ok, type Result } from "@/lib/domain/result"
 import { SupabaseRepository } from "@/lib/repo/supabase"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { describeError, logger } from "@/lib/log"
 
 /**
  * Server actions are thin: authenticate, validate, delegate to the repository,
@@ -36,12 +37,13 @@ async function withRepo<T>(fn: (repo: SupabaseRepository) => Promise<Result<T>>)
     if (result.ok) revalidatePath("/dashboard")
     return result
   } catch (error) {
-    console.error("[action]", error)
+    logger({ scope: "action" }).error("unhandled", describeError(error))
     return fail("INTERNAL", "Something went wrong. Please try again.")
   }
 }
 
 const idSchema = z.string().uuid()
+const collectionNameSchema = z.string().trim().min(1, "Give the collection a name.").max(60, "Keep the name under 60 characters.")
 
 export async function createBookmarkAction(input: NewBookmark): Promise<Result<Bookmark>> {
   const parsed = newBookmarkSchema.safeParse(input)
@@ -71,13 +73,17 @@ export async function importBookmarksAction(
 }
 
 export async function createCollectionAction(name: string): Promise<Result<Collection>> {
-  return withRepo((repo) => repo.createCollection(String(name)))
+  const parsed = collectionNameSchema.safeParse(name)
+  if (!parsed.success) return fail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid name.")
+  return withRepo((repo) => repo.createCollection(parsed.data))
 }
 
 export async function renameCollectionAction(id: string, name: string): Promise<Result<Collection>> {
   const pid = idSchema.safeParse(id)
+  const parsed = collectionNameSchema.safeParse(name)
   if (!pid.success) return fail("VALIDATION", "Invalid id.")
-  return withRepo((repo) => repo.renameCollection(pid.data, String(name)))
+  if (!parsed.success) return fail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid name.")
+  return withRepo((repo) => repo.renameCollection(pid.data, parsed.data))
 }
 
 export async function deleteCollectionAction(id: string): Promise<Result<void>> {

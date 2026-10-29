@@ -308,7 +308,12 @@ export async function safeFetch(url: string, init: SafeFetchInit = {}): Promise<
         await response.body?.cancel().catch(() => undefined)
         if (hop >= MAX_REDIRECTS) return fail("UPSTREAM", "too many redirects")
         try {
-          current = new URL(location, guard.data).href
+          const next = new URL(location, guard.data)
+          // A page we reached over TLS must not send us on to plain http.
+          if (guard.data.protocol === "https:" && next.protocol === "http:") {
+            return fail("BLOCKED_URL", "redirect downgraded from https to http")
+          }
+          current = next.href
         } catch {
           return fail("UPSTREAM", "redirect to an invalid location")
         }
