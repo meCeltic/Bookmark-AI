@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, BookMarked, Download, FolderPlus, Inbox, Library, LogOut, Settings, Star, Upload, HeartPulse, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Archive, BookMarked, BookOpenText, Download, FolderPlus, Inbox, Library, LogOut, Settings, Star, Upload, HeartPulse, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useState, type ReactNode } from "react"
 import type { SystemView } from "@/lib/domain/bookmark"
@@ -32,6 +32,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
   const [newName, setNewName] = useState<string | null>(null)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [tagEdit, setTagEdit] = useState<{ from: string; to: string } | null>(null)
+  const [allTags, setAllTags] = useState(false)
 
   const select = (view: typeof state.view) => {
     api.dispatch({ type: "view", view })
@@ -84,10 +85,10 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
                   value={renaming.name}
                   maxLength={60}
                   onChange={(e) => setRenaming({ id: c.id, name: e.target.value })}
-                  onBlur={() => setRenaming(null)}
+                  onBlur={() => { if (renaming.name.trim() && renaming.name.trim() !== c.name) void api.renameCollection(c.id, renaming.name); setRenaming(null) }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") { void api.renameCollection(c.id, renaming.name); setRenaming(null) }
-                    if (e.key === "Escape") setRenaming(null)
+                    if (e.key === "Enter") e.currentTarget.blur()
+                    if (e.key === "Escape") { setRenaming({ id: c.id, name: c.name }); e.currentTarget.blur() }
                   }}
                 />
               ) : (
@@ -102,7 +103,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
                   </button>
                   <MenuRoot>
                     <MenuTrigger asChild>
-                      <button type="button" className="btn btn-ghost btn-icon mr-1 h-6 w-6 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100" aria-label={`Options for ${c.name}`}>
+                      <button type="button" className="hover-reveal btn btn-ghost btn-icon mr-1 h-6 w-6" aria-label={`Options for ${c.name}`}>
                         <MoreHorizontal size={13} />
                       </button>
                     </MenuTrigger>
@@ -124,14 +125,16 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
             maxLength={60}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onBlur={() => setNewName(null)}
-            onKeyDown={async (e) => {
-              if (e.key === "Enter" && newName.trim()) {
-                const c = await api.createCollection(newName)
-                setNewName(null)
-                if (c) select({ kind: "collection", id: c.id })
-              }
-              if (e.key === "Escape") setNewName(null)
+            onBlur={async () => {
+              const name = newName.trim()
+              setNewName(null)
+              if (!name) return
+              const c = await api.createCollection(name)
+              if (c) select({ kind: "collection", id: c.id })
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur()
+              if (e.key === "Escape") { setNewName(""); e.currentTarget.blur() }
             }}
           />
         ) : null}
@@ -144,7 +147,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
         <>
           <div className="mt-5 px-4"><span className="meta">Tags</span></div>
           <div className="mt-1 px-2">
-            {counts.tags.slice(0, 16).map(({ tag, count }) => {
+            {(allTags ? counts.tags : counts.tags.slice(0, 12)).map(({ tag, count }) => {
               const active = state.tags.includes(tag)
               if (tagEdit?.from === tag) {
                 return (
@@ -156,10 +159,10 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
                     maxLength={32}
                     placeholder="new name, empty removes"
                     onChange={(e) => setTagEdit({ from: tag, to: e.target.value })}
-                    onBlur={() => setTagEdit(null)}
+                    onBlur={() => { if (tagEdit.to.trim() !== tag) void api.renameTag(tag, tagEdit.to); setTagEdit(null) }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") { void api.renameTag(tag, tagEdit.to); setTagEdit(null) }
-                      if (e.key === "Escape") setTagEdit(null)
+                      if (e.key === "Enter") e.currentTarget.blur()
+                      if (e.key === "Escape") { setTagEdit({ from: tag, to: tag }); e.currentTarget.blur() }
                     }}
                   />
                 )
@@ -178,7 +181,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
                   </button>
                   <MenuRoot>
                     <MenuTrigger asChild>
-                      <button type="button" className="btn btn-ghost btn-icon mr-1 h-6 w-6 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100" aria-label={`Options for tag ${tag}`}>
+                      <button type="button" className="hover-reveal btn btn-ghost btn-icon mr-1 h-6 w-6" aria-label={`Options for tag ${tag}`}>
                         <MoreHorizontal size={13} />
                       </button>
                     </MenuTrigger>
@@ -190,11 +193,19 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
                 </div>
               )
             })}
+            {counts.tags.length > 12 ? (
+              <button type="button" className="px-2 py-1 font-mono text-[11px] text-ink-3 underline-offset-2 hover:text-accent hover:underline" onClick={() => setAllTags((v) => !v)}>
+                {allTags ? "fewer" : `all ${counts.tags.length} tags`}
+              </button>
+            ) : null}
           </div>
         </>
       ) : null}
 
       <div className="mt-auto border-t border-border px-2 pb-3 pt-3">
+        {api.pendingCount > 0 ? (
+          <SideAction icon={<BookOpenText size={14} />} label={`Read ${api.pendingCount} pending pages`} onClick={() => api.readPending()} />
+        ) : null}
         <SideAction icon={<HeartPulse size={14} />} label="Check links" onClick={() => api.checkHealth()} />
         <SideAction icon={<Upload size={14} />} label="Import bookmarks" onClick={onImport} />
         <SideAction icon={<Download size={14} />} label="Export" onClick={onExport} />

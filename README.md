@@ -82,7 +82,7 @@ Open http://localhost:3000. With no env vars at all you get demo mode only, whic
 | `NEXT_PUBLIC_SITE_URL` | Absolute links in auth emails. |
 
 ```bash
-npm test          # vitest, ~260 tests, under a second
+npm test          # vitest, ~270 tests, about a second
 npm run verify    # lint + typecheck + test + build, what CI runs
 ```
 

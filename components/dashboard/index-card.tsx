@@ -97,7 +97,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
         </MenuSub>
         <MenuSeparator />
         <MenuItem onSelect={() => api.reEnrich(bookmark.id)} disabled={pending}><RefreshCw size={14} /> Read page again</MenuItem>
-        <MenuItem onSelect={() => api.patch(bookmark.id, { archivedAt: bookmark.archivedAt ? null : new Date().toISOString() })}>
+        <MenuItem onSelect={() => api.patchMany([bookmark.id], { archivedAt: bookmark.archivedAt ? null : new Date().toISOString() }, bookmark.archivedAt ? "restored" : "archived")}>
           {bookmark.archivedAt ? <ArchiveRestore size={14} /> : <Archive size={14} />} {bookmark.archivedAt ? "Restore" : "Archive"}<span className="kbd ml-auto">e</span>
         </MenuItem>
         <MenuItem danger onSelect={() => api.remove([bookmark.id])}><Trash2 size={14} /> Delete<span className="kbd ml-auto">⌫</span></MenuItem>
@@ -108,24 +108,33 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
   const tags = (
     <div className="flex flex-wrap items-center gap-1.5">
       {bookmark.tags.map((tag) => (
-        <button
-          key={tag}
-          type="button"
-          className={cn("stamp anim-stamp", state.tags.includes(tag) && "stamp-active")}
-          data-active={state.tags.includes(tag)}
-          title={state.tags.includes(tag) ? `Stop filtering by ${tag}` : `Filter by ${tag}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            const next = state.tags.includes(tag) ? state.tags.filter((t) => t !== tag) : [...state.tags, tag]
-            api.dispatch({ type: "tags", tags: next })
-          }}
-          onContextMenu={(e) => {
-            e.preventDefault()
-            void api.removeTag(bookmark.id, tag)
-          }}
-        >
-          {tag}
-        </button>
+        <span key={tag} className="group/stamp relative inline-flex">
+          <button
+            type="button"
+            className="stamp anim-stamp"
+            data-active={state.tags.includes(tag)}
+            title={state.tags.includes(tag) ? `Stop filtering by ${tag}` : `Filter by ${tag}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              const next = state.tags.includes(tag) ? state.tags.filter((t) => t !== tag) : [...state.tags, tag]
+              api.dispatch({ type: "tags", tags: next })
+            }}
+          >
+            {tag}
+          </button>
+          <button
+            type="button"
+            aria-label={`Remove tag ${tag}`}
+            title="Remove tag"
+            className="hover-reveal absolute -right-1.5 -top-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-border-strong bg-surface font-mono text-[10px] leading-none text-ink-2 hover:border-danger hover:text-danger"
+            onClick={(e) => {
+              e.stopPropagation()
+              void api.removeTag(bookmark.id, tag)
+            }}
+          >
+            ×
+          </button>
+        </span>
       ))}
       {tagDraft !== null ? (
         <input
@@ -154,8 +163,8 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
       aria-label={selected ? "Deselect" : "Select"}
       onClick={toggleSelect}
       className={cn(
-        "select-tab inline-flex items-center justify-center rounded-[2px] border transition-colors",
-        selected ? "border-accent bg-accent text-accent-ink" : "border-border-strong bg-surface opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+        "select-tab hover-reveal inline-flex items-center justify-center rounded-[2px] border transition-colors",
+        selected ? "border-accent bg-accent text-accent-ink" : "border-border-strong bg-surface",
         selecting && "opacity-100",
       )}
     >

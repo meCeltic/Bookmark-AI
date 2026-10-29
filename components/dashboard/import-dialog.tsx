@@ -46,6 +46,7 @@ export function ImportDialog({ open, onOpenChange }: Props) {
     onOpenChange(false)
     setItems(null)
     toast.success(created ? `Filed ${created} ${created === 1 ? "card" : "cards"}${skipped ? `, skipped ${skipped} already saved` : ""}` : "Everything in that file was already saved.")
+    if (created) void api.readPending()
   }
 
   const folders = items ? new Set(items.map((i) => i.folder[0]).filter(Boolean)).size : 0

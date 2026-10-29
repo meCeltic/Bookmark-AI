@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Bookmark } from "@/lib/domain/bookmark"
 import { cn } from "@/lib/utils"
 import { IndexCard } from "./index-card"
@@ -26,6 +26,33 @@ export function BookmarkGrid() {
 
   useKeyboard({ items, focusId, setFocusId })
 
+  // Large drawers render in slices; a sentinel at the bottom asks for the next slice.
+  const PAGE = 90
+  const [limit, setLimit] = useState(PAGE)
+  const sentinel = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    const el = sentinel.current
+    if (!el || limit >= items.length) return
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setLimit((l) => l + PAGE)
+    })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [limit, items.length])
+
+  // "Show" on a duplicate toast, or a palette hit: scroll to the card and focus it.
+  useEffect(() => {
+    const onReveal = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      const at = items.findIndex((b) => b.id === id)
+      if (at >= limit) setLimit(at + PAGE)
+      setFocusId(id)
+      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.scrollIntoView({ block: "center" }))
+    }
+    window.addEventListener("bookmark-ai:reveal", onReveal)
+    return () => window.removeEventListener("bookmark-ai:reveal", onReveal)
+  }, [items, limit])
+
   if (state.bookmarks.length === 0) return <EmptyDrawer />
   if (items.length === 0) {
     if (hits) return <NoMatch query={state.query} />
@@ -46,7 +73,7 @@ export function BookmarkGrid() {
           : "card overflow-hidden",
       )}
     >
-      {items.map((b, i) => (
+      {items.slice(0, limit).map((b, i) => (
         <IndexCard
           key={b.id}
           bookmark={b}
@@ -58,6 +85,11 @@ export function BookmarkGrid() {
           onFocus={() => setFocusId(b.id)}
         />
       ))}
+      {limit < items.length ? (
+        <li ref={sentinel} className="col-span-full py-6 text-center font-mono text-[11.5px] text-ink-3">
+          {items.length - limit} more…
+        </li>
+      ) : null}
     </ul>
   )
 }

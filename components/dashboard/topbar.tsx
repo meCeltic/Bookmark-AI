@@ -107,8 +107,8 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
 
       <MenuRoot>
         <MenuTrigger asChild>
-          <button type="button" className="btn btn-ghost btn-sm hidden gap-1.5 text-ink-2 md:inline-flex" aria-label="Sort">
-            <ArrowDownUp size={14} /> {SORT_LABEL[state.sort]}
+          <button type="button" className="btn btn-ghost btn-sm gap-1.5 text-ink-2" aria-label="Sort">
+            <ArrowDownUp size={14} /> <span className="hidden md:inline">{SORT_LABEL[state.sort]}</span>
           </button>
         </MenuTrigger>
         <MenuContent>

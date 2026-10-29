@@ -30,7 +30,9 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
         const next = items[Math.max(0, Math.min(items.length - 1, index + delta))]
         if (next) {
           setFocusId(next.id)
-          document.querySelector<HTMLElement>(`[data-id="${next.id}"]`)?.scrollIntoView({ block: "nearest" })
+          const el = document.querySelector<HTMLElement>(`[data-id="${next.id}"]`)
+          if (el) el.scrollIntoView({ block: "nearest" })
+          else window.dispatchEvent(new CustomEvent("bookmark-ai:reveal", { detail: next.id }))
         }
       }
 
@@ -40,7 +42,13 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
         case "Enter": if (current) { e.preventDefault(); api.open(current) } break
         case "f": if (current) void api.patch(current.id, { favourite: !current.favourite }); break
         case "r": if (current) void api.patch(current.id, { readAt: current.readAt ? null : new Date().toISOString() }); break
-        case "e": if (current) void api.patch(current.id, { archivedAt: current.archivedAt ? null : new Date().toISOString() }); break
+        case "e":
+          if (current) {
+            const neighbour = items[index + 1] ?? items[index - 1]
+            void api.patchMany([current.id], { archivedAt: current.archivedAt ? null : new Date().toISOString() }, current.archivedAt ? "restored" : "archived")
+            if (neighbour) setFocusId(neighbour.id)
+          }
+          break
         case "x": if (current) api.dispatch({ type: "select", ids: [current.id], mode: "toggle" }); break
         case "c": if (current) { void navigator.clipboard.writeText(current.url); toast("Link copied") } break
         case "Backspace": case "Delete":

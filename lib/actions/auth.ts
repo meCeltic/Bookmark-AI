@@ -26,7 +26,9 @@ export async function signInAction(_prev: AuthState, form: FormData): Promise<Au
   const supabase = await createSupabaseServerClient()
   if (!supabase) return { error: "Sign-in is not configured on this deployment. Use the demo." }
   const { error } = await supabase.auth.signInWithPassword({ email: parsed.data.email, password: parsed.data.password })
-  if (error) return { error: "Email or password did not match." }
+  if (error) {
+    return { error: /fetch|network|ENOTFOUND|ECONNREFUSED/i.test(error.message) ? "Could not reach the sign-in service. Try the demo meanwhile." : "Email or password did not match." }
+  }
   redirect(safeNextPath(parsed.data.next))
 }
 

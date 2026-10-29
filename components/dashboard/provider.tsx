@@ -27,7 +27,7 @@ import { requestEnrichment, requestHealth } from "@/lib/client/enrich"
 import { readPrefs, writePrefs, type Layout } from "@/lib/client/prefs"
 import { applyFilter, tagCounts, viewCounts, collectionCounts } from "@/lib/search/filter"
 import { createSearchIndex, searchBookmarks, type SearchHit } from "@/lib/search/rank"
-import { normalizeUrl, canonicalKey } from "@/lib/url/normalize"
+import { normalizeUrl, canonicalKey, domainOf } from "@/lib/url/normalize"
 import type { ImportedBookmark } from "@/lib/import/netscape"
 import { dedupeImports } from "@/lib/import/netscape"
 
@@ -146,7 +146,13 @@ export interface DashboardApi {
   deleteCollection: (id: string) => Promise<void>
 
   importItems: (items: ImportedBookmark[]) => Promise<{ created: number; skipped: number }>
+  /** Read every card still marked pending, a few at a time, with a progress toast. */
+  readPending: () => Promise<void>
+  /** How many cards are still waiting to be read. */
+  pendingCount: number
   checkHealth: (ids?: string[]) => Promise<void>
+  /** Scroll to a card and give it keyboard focus. */
+  reveal: (id: string) => void
   resetDemo: () => Promise<void>
   reload: () => Promise<void>
 }
@@ -185,9 +191,11 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   const enrichAborts = useRef(new Map<string, AbortController>())
   // Always the latest bookmarks, for callbacks that resolve after a state change.
   const latest = useRef(state.bookmarks)
+  const latestCollections = useRef(state.collections)
   useEffect(() => {
     latest.current = state.bookmarks
-  }, [state.bookmarks])
+    latestCollections.current = state.collections
+  }, [state.bookmarks, state.collections])
 
   const reload = useCallback(async () => {
     const [bookmarks, collections] = await Promise.all([repo.listBookmarks(), repo.listCollections()])
@@ -258,18 +266,26 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   )
 
   const enrich = useCallback(
-    async (bookmark: Bookmark) => {
+    async (bookmark: Bookmark, quiet = false): Promise<"ok" | "failed" | "rate-limited"> => {
       enrichAborts.current.get(bookmark.id)?.abort()
       const controller = new AbortController()
       enrichAborts.current.set(bookmark.id, controller)
       dispatch({ type: "pending", id: bookmark.id, on: true })
       try {
         const res = await requestEnrichment(bookmark.url, controller.signal)
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted) return "failed"
         if (!res.ok) {
+          if (res.error.code === "RATE_LIMITED") {
+            if (!quiet) toast.error(res.error.message)
+            return "rate-limited"
+          }
           await applyRemotePatch(bookmark.id, { enrichment: "failed" }, undefined, true)
-          if (res.error.code === "RATE_LIMITED") toast.error(res.error.message)
-          return
+          if (res.error.code === "BLOCKED_URL") toast.error(res.error.message)
+          else if (!quiet) toast(`Couldn't read ${domainOf(bookmark.url)}. Kept the link.`)
+          return "failed"
+        }
+        if (res.data.source === "none" && !quiet) {
+          toast(`${domainOf(bookmark.url)} didn't answer with a page. Kept the link.`)
         }
         const e = res.data
         // The user may have edited the card while it was being read; their
@@ -288,6 +304,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
           enrichment: e.source === "ai" ? "done" : e.source === "metadata" ? "fallback" : "failed",
         }
         await applyRemotePatch(bookmark.id, patch, undefined, true)
+        return "ok"
       } finally {
         if (enrichAborts.current.get(bookmark.id) === controller) enrichAborts.current.delete(bookmark.id)
         dispatch({ type: "pending", id: bookmark.id, on: false })
@@ -297,6 +314,44 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   )
 
   // ---- public api ---------------------------------------------------------
+
+  const reveal = useCallback<DashboardApi["reveal"]>((id) => {
+    dispatch({ type: "query", query: "" })
+    dispatch({ type: "tags", tags: [] })
+    dispatch({ type: "healthFilter", value: null })
+    window.dispatchEvent(new CustomEvent("bookmark-ai:reveal", { detail: id }))
+  }, [])
+
+  const readingRef = useRef(false)
+  const readPending = useCallback<DashboardApi["readPending"]>(async () => {
+    if (readingRef.current) return
+    const queue = latest.current.filter((b) => b.enrichment === "pending" && !b.archivedAt)
+    if (!queue.length) return
+    readingRef.current = true
+    const toastId = toast.loading(`Reading ${queue.length} pages…`)
+    let done = 0
+    let stopped = false
+    try {
+      // Two at a time keeps well under the per-minute limit; a 429 ends the run early.
+      const worker = async () => {
+        while (queue.length && !stopped) {
+          const next = queue.shift()!
+          const outcome = await enrich(next, true)
+          if (outcome === "rate-limited") {
+            stopped = true
+            break
+          }
+          done += 1
+          toast.loading(`Reading pages… ${done} of ${done + queue.length}`, { id: toastId })
+        }
+      }
+      await Promise.all([worker(), worker()])
+    } finally {
+      readingRef.current = false
+      if (stopped) toast.error(`Read ${done} pages, then hit the limit. Run "Read pending pages" again in a minute.`, { id: toastId })
+      else toast.success(`Read ${done} ${done === 1 ? "page" : "pages"}`, { id: toastId })
+    }
+  }, [enrich])
 
   const addBookmark = useCallback<DashboardApi["addBookmark"]>(
     async (raw, opts) => {
@@ -310,7 +365,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       if (existing) {
         toast("Already in your drawer", {
           description: `Saved ${new Date(existing.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.`,
-          action: { label: "Show", onClick: () => dispatch({ type: "query", query: existing.title }) },
+          action: { label: "Show", onClick: () => reveal(existing.id) },
         })
         return existing
       }
@@ -342,7 +397,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       void enrich(result.data)
       return result.data
     },
-    [repo, state.view, enrich],
+    [repo, state.view, enrich, reveal],
   )
 
   const reEnrich = useCallback<DashboardApi["reEnrich"]>(
@@ -471,6 +526,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
         toast.error("Tags are lowercase words, digits and - . + #")
         return
       }
+      const before = latest.current.filter((b) => b.tags.includes(from))
       const result = await repo.renameTag(from, target)
       if (!result.ok) {
         toast.error(result.error.message)
@@ -478,9 +534,19 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       }
       await reload()
       if (state.tags.includes(from)) {
-        dispatch({ type: "tags", tags: state.tags.map((t) => (t === from ? to : t)).filter(Boolean) })
+        dispatch({ type: "tags", tags: state.tags.map((t) => (t === from ? target : t)).filter(Boolean) })
       }
-      toast(to ? `Renamed "${from}" to "${to}" on ${result.data.affected} cards` : `Removed "${from}" from ${result.data.affected} cards`)
+      toast(target ? `Renamed "${from}" to "${target}" on ${result.data.affected} cards` : `Removed "${from}" from ${result.data.affected} cards`, {
+        duration: 6000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            // Restore each card's exact tag list; a merge cannot be undone by renaming back.
+            await Promise.all(before.map((b) => repo.updateBookmark(b.id, { tags: b.tags })))
+            await reload()
+          },
+        },
+      })
     },
     [repo, reload, state.tags],
   )
@@ -512,18 +578,34 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
 
   const deleteCollection = useCallback<DashboardApi["deleteCollection"]>(
     async (id) => {
+      const collection = state.collections.find((c) => c.id === id)
+      const members = state.bookmarks.filter((b) => b.collectionId === id)
       const result = await repo.deleteCollection(id)
-      if (!result.ok) {
-        toast.error(result.error.message)
+      if (!result.ok || !collection) {
+        toast.error(result.ok ? "That collection is gone." : result.error.message)
         return
       }
       dispatch({ type: "collections", collections: state.collections.filter((c) => c.id !== id) })
-      dispatch({
-        type: "upsertMany",
-        bookmarks: state.bookmarks.filter((b) => b.collectionId === id).map((b) => ({ ...b, collectionId: null })),
-      })
+      dispatch({ type: "upsertMany", bookmarks: members.map((b) => ({ ...b, collectionId: null })) })
       if (state.view.kind === "collection" && state.view.id === id) dispatch({ type: "view", view: { kind: "view", view: "all" } })
-      toast("Collection removed. Its cards are now unsorted.")
+      toast(`Removed "${collection.name}". Its ${members.length} cards are now unsorted.`, {
+        duration: 6000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            const again = await repo.createCollection(collection.name)
+            if (!again.ok) {
+              toast.error("Could not restore the collection.")
+              return
+            }
+            dispatch({ type: "collections", collections: [...latestCollections.current, again.data] })
+            if (members.length) {
+              const moved = await repo.updateBookmarks(members.map((b) => b.id), { collectionId: again.data.id })
+              if (moved.ok) dispatch({ type: "upsertMany", bookmarks: moved.data })
+            }
+          },
+        },
+      })
     },
     [repo, state.collections, state.bookmarks, state.view],
   )
@@ -533,14 +615,17 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       const existing = new Set(state.bookmarks.map((b) => b.urlNormalized))
       const { fresh, skipped } = dedupeImports(items, existing, canonicalKey)
       if (!fresh.length) return { created: 0, skipped }
+      const progress = toast.loading(`Filing ${fresh.length} cards…`)
+      // "Bookmarks bar / Rust / Async" keeps nesting visible as one collection name.
+      const folderName = (item: ImportedBookmark) => item.folder.map((f) => f.trim()).filter(Boolean).join(" / ").slice(0, 60)
 
       // Folders become collections, created on demand.
       const byName = new Map(state.collections.map((c) => [c.name.toLowerCase(), c]))
       const collections = [...state.collections]
       for (const item of fresh) {
-        const folder = item.folder[0]?.trim()
+        const folder = folderName(item)
         if (!folder || byName.has(folder.toLowerCase())) continue
-        const result = await repo.createCollection(folder.slice(0, 60))
+        const result = await repo.createCollection(folder)
         if (result.ok) {
           byName.set(folder.toLowerCase(), result.data)
           collections.push(result.data)
@@ -552,11 +637,12 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
         url: item.url,
         title: item.title.slice(0, 300),
         tags: item.tags.slice(0, 8),
-        collectionId: item.folder[0] ? (byName.get(item.folder[0].toLowerCase())?.id ?? null) : null,
+        collectionId: folderName(item) ? (byName.get(folderName(item).toLowerCase())?.id ?? null) : null,
         createdAt: item.addedAt ?? undefined,
         enrichment: "pending",
       }))
       const result = await repo.importBookmarks(inputs)
+      toast.dismiss(progress)
       if (!result.ok) {
         toast.error(result.error.message)
         return { created: 0, skipped }
@@ -569,11 +655,17 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
 
   const checkHealth = useCallback<DashboardApi["checkHealth"]>(
     async (ids) => {
-      const targets = (ids ? state.bookmarks.filter((b) => ids.includes(b.id)) : visible).slice(0, 40)
+      const targets = ids ? state.bookmarks.filter((b) => ids.includes(b.id)) : visible
       if (!targets.length) return
       const id = toast.loading(`Checking ${targets.length} links…`)
       try {
-        const results = await requestHealth(targets.map((b) => b.url))
+        // The route takes 40 at a time; walk the whole view in batches.
+        const results: Awaited<ReturnType<typeof requestHealth>> = []
+        for (let i = 0; i < targets.length; i += 40) {
+          const batch = targets.slice(i, i + 40)
+          results.push(...(await requestHealth(batch.map((b) => b.url))))
+          toast.loading(`Checking links… ${Math.min(i + 40, targets.length)} of ${targets.length}`, { id })
+        }
         const byUrl = new Map(results.map((r) => [r.url, r.health]))
         const stamp = new Date().toISOString()
         const updated = targets.map((b) => ({ ...b, health: byUrl.get(b.url) ?? b.health, healthCheckedAt: stamp }))
@@ -628,13 +720,16 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       renameCollection,
       deleteCollection,
       importItems,
+      readPending,
+      pendingCount: state.bookmarks.filter((b) => b.enrichment === "pending" && !b.archivedAt).length,
       checkHealth,
+      reveal,
       resetDemo,
       reload,
     }),
     [
       mode, state, visible, hits, counts, addBookmark, reEnrich, patch, patchMany, remove, open, addTag, removeTag,
-      renameTag, createCollection, renameCollection, deleteCollection, importItems, checkHealth, resetDemo, reload,
+      renameTag, createCollection, renameCollection, deleteCollection, importItems, readPending, checkHealth, reveal, resetDemo, reload,
     ],
   )
 

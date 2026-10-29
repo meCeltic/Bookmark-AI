@@ -83,7 +83,7 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
         </main>
       </div>
 
-      <BulkBar />
+      <BulkBar onExport={() => setExporting(true)} />
       <CommandPalette open={palette} onOpenChange={setPalette} onImport={() => setImporting(true)} onExport={() => setExporting(true)} onHelp={() => setHelp(true)} />
       <ImportDialog open={importing} onOpenChange={setImporting} />
       <ExportDialog open={exporting} onOpenChange={setExporting} />

@@ -60,15 +60,27 @@ export async function enrichUrl(url: string, deps: PipelineDeps = defaultDeps())
     }
   }
 
+  // No model: the page's own description, or failing that its opening sentences.
+  const summary = page.description ?? openingOf(page.text)
   return ok(
     enrichmentSchema.parse({
       ...base,
-      summary: page.description,
+      summary,
       tags: [],
       category: null,
-      source: page.description ? "metadata" : "none",
+      source: summary ? "metadata" : "none",
     }),
   )
+}
+
+/** The first sentences of the readable text, cut at a sentence end where possible, max 280 chars. */
+export function openingOf(text: string, max = 280): string | null {
+  const clean = text.replace(/\s+/g, " ").trim()
+  if (clean.length < 40) return null
+  if (clean.length <= max) return clean
+  const slice = clean.slice(0, max)
+  const end = Math.max(slice.lastIndexOf(". "), slice.lastIndexOf("? "), slice.lastIndexOf("! "))
+  return end >= 40 ? slice.slice(0, end + 1) : slice.slice(0, slice.lastIndexOf(" ")) + "…"
 }
 
 function unreachable(url: string, contentType = ""): Enrichment {

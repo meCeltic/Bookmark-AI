@@ -1,7 +1,8 @@
 "use client"
 
 import { Command } from "cmdk"
-import { Archive, BookMarked, Download, ExternalLink, FolderPlus, HeartPulse, Inbox, LayoutGrid, Library, Moon, Plus, Rows3, Star, Sun, Upload, Keyboard, Tag } from "lucide-react"
+import { Archive, ArrowDownUp, BookMarked, BookOpenText, Download, ExternalLink, FolderPlus, HeartPulse, Inbox, LayoutGrid, Library, Moon, Plus, Rows3, Star, Sun, Upload, Keyboard, Tag } from "lucide-react"
+import { SORT_ORDERS, type SortOrder } from "@/lib/domain/bookmark"
 import { useTheme } from "next-themes"
 import { useEffect, useMemo, useState } from "react"
 import { normalizeUrl } from "@/lib/url/normalize"
@@ -112,6 +113,9 @@ export function CommandPalette({ open, onOpenChange, onImport, onExport, onHelp 
                   {state.selected.size ? (
                     <Item onSelect={() => { setPage("tag"); setQuery("") }}><Tag size={14} /> Tag {state.selected.size} selected</Item>
                   ) : null}
+                  {api.pendingCount > 0 ? (
+                    <Item onSelect={run(() => void api.readPending())}><BookOpenText size={14} /> Read {api.pendingCount} pending pages</Item>
+                  ) : null}
                   <Item onSelect={run(() => void api.checkHealth())}><HeartPulse size={14} /> Check links in this view</Item>
                   <Item onSelect={run(onImport)}><Upload size={14} /> Import bookmarks</Item>
                   <Item onSelect={run(onExport)}><Download size={14} /> Export</Item>
@@ -123,6 +127,14 @@ export function CommandPalette({ open, onOpenChange, onImport, onExport, onHelp 
                   </Item>
                   <Item onSelect={run(onHelp)}><Keyboard size={14} /> Keyboard shortcuts<span className="kbd ml-auto">?</span></Item>
                 </Command.Group>
+
+                <Command.Group heading={<Heading>Sort</Heading>}>
+                  {SORT_ORDERS.map((s) => (
+                    <Item key={s} value={`sort ${SORT_LABEL[s]}`} onSelect={run(() => api.dispatch({ type: "sort", sort: s }))}>
+                      <ArrowDownUp size={14} /> {SORT_LABEL[s]}{state.sort === s ? <span className="ml-auto font-mono text-[11px] text-ink-3">current</span> : null}
+                    </Item>
+                  ))}
+                </Command.Group>
               </>
             )}
           </Command.List>
@@ -130,6 +142,14 @@ export function CommandPalette({ open, onOpenChange, onImport, onExport, onHelp 
       </DialogContent>
     </Dialog>
   )
+}
+
+const SORT_LABEL: Record<SortOrder, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  title: "Title A–Z",
+  domain: "By site",
+  opened: "Recently opened",
 }
 
 const Heading = ({ children }: { children: string }) => <span className="meta block px-2 pb-1 pt-2">{children}</span>
