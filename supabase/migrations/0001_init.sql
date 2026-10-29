@@ -43,7 +43,8 @@ create table public.bookmarks (
   search tsvector generated always as (
     setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
     setweight(to_tsvector('english', coalesce(summary, '')), 'B') ||
-    setweight(to_tsvector('simple',  array_to_string(tags, ' ')), 'C') ||
+    -- array_to_tsvector is immutable (array_to_string is only stable), so it may live in a generated column.
+    setweight(array_to_tsvector(tags), 'C') ||
     setweight(to_tsvector('simple',  coalesce(url_normalized, '')), 'D')
   ) stored,
   -- Duplicates are a database guarantee, not a JavaScript hope.
@@ -79,6 +80,8 @@ create policy "bookmarks: owner only" on public.bookmarks
 
 -- --------------------------------------------------------------------- search
 -- Ranked full-text search with a trigram fallback for typos and partial words.
+-- word_similarity (the <% operator) compares the query against the closest
+-- word in the title, so "postgre" still finds "PostgreSQL: Full Text Search".
 -- RLS still applies because the function runs with the caller's rights.
 create or replace function public.search_bookmarks(q text, max_rows integer default 50)
 returns setof public.bookmarks
@@ -88,10 +91,10 @@ as $$
   select b.*
   from public.bookmarks b, query
   where b.user_id = auth.uid()
-    and (b.search @@ query.tsq or b.title % q)
+    and (b.search @@ query.tsq or q <% b.title)
   order by
     ts_rank_cd(b.search, query.tsq) desc,
-    similarity(b.title, q) desc,
+    word_similarity(q, b.title) desc,
     b.created_at desc
   limit max_rows;
 $$;
