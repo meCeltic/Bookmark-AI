@@ -21,6 +21,15 @@ export function BookmarkGrid() {
   const [rawFocusId, setFocusId] = useState<string | null>(null)
 
   const items: Bookmark[] = useMemo(() => (hits ? hits.map((h) => h.bookmark) : visible), [hits, visible])
+  // Title ranges from the ranker, so fuzzy hits are highlighted where they matched.
+  const titleRanges = useMemo(() => {
+    const map = new Map<string, [number, number][]>()
+    for (const h of hits ?? []) {
+      const ranges = h.matches.filter((m) => m.key === "title").flatMap((m) => m.indices)
+      if (ranges.length) map.set(h.bookmark.id, ranges)
+    }
+    return map
+  }, [hits])
 
   const focusId = rawFocusId && items.some((b) => b.id === rawFocusId) ? rawFocusId : null
 
@@ -83,6 +92,7 @@ export function BookmarkGrid() {
           pending={state.pending.has(b.id)}
           selected={state.selected.has(b.id)}
           onFocus={() => setFocusId(b.id)}
+          titleRanges={titleRanges.get(b.id)}
         />
       ))}
       {limit < items.length ? (

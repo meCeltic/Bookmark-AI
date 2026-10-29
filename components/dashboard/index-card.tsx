@@ -11,6 +11,12 @@ import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuSub, MenuTrigger } 
 import { useDashboard } from "./provider"
 import { highlightRanges } from "@/lib/search/rank"
 
+function markRanges(text: string, ranges: [number, number][]) {
+  return highlightRanges(text, ranges).map((seg, i) =>
+    seg.hit ? <mark key={i} className="rounded-[1px] bg-accent-soft text-ink">{seg.text}</mark> : <span key={i}>{seg.text}</span>,
+  )
+}
+
 /** Wrap the query words found in a title with <mark>. */
 function highlight(text: string, query: string) {
   const words = query.trim().toLowerCase().split(/\s+/).filter((w) => w.length >= 2)
@@ -25,9 +31,7 @@ function highlight(text: string, query: string) {
     }
   }
   if (!ranges.length) return text
-  return highlightRanges(text, ranges).map((seg, i) =>
-    seg.hit ? <mark key={i} className="rounded-[1px] bg-accent-soft text-ink">{seg.text}</mark> : <span key={i}>{seg.text}</span>,
-  )
+  return markRanges(text, ranges)
 }
 
 interface Props {
@@ -38,9 +42,11 @@ interface Props {
   pending: boolean
   selected: boolean
   onFocus: () => void
+  /** Inclusive index pairs in the title that matched the search, if any. */
+  titleRanges?: [number, number][]
 }
 
-export function IndexCard({ bookmark, layout, index, focused, pending, selected, onFocus }: Props) {
+export function IndexCard({ bookmark, layout, index, focused, pending, selected, onFocus, titleRanges }: Props) {
   const api = useDashboard()
   const [tagDraft, setTagDraft] = useState<string | null>(null)
   const { state } = api
@@ -87,8 +93,8 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
   const aiLabel =
     bookmark.enrichment === "done" ? "AI summary" : bookmark.enrichment === "fallback" ? "From page metadata" : bookmark.enrichment === "failed" ? "Could not read this page" : pending ? "Reading page…" : "Not read yet"
   const statusText =
-    bookmark.enrichment === "done" ? "ai summary" : bookmark.enrichment === "fallback" ? "page meta" : bookmark.enrichment === "failed" ? "unread page" : pending ? "reading" : "not read yet"
-  const title = highlight(bookmark.title, state.query)
+    bookmark.enrichment === "done" ? "ai summary" : bookmark.enrichment === "fallback" ? "page meta" : bookmark.enrichment === "failed" ? "couldn't read" : pending ? "reading" : "not read yet"
+  const title = titleRanges ? markRanges(bookmark.title, titleRanges) : highlight(bookmark.title, state.query)
 
   const menu = (
     <MenuRoot>
