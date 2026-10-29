@@ -15,17 +15,17 @@ export function BulkBar({ onExport }: { onExport: () => void }) {
   return (
     <div className="card anim-pop fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded-none border-x-0 border-b-0 px-2 py-2 shadow-card sm:inset-x-auto sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2 sm:rounded-[2px] sm:border sm:py-1.5">
       <span className="px-2 font-mono text-[12px]">{ids.length} selected</span>
-      <button type="button" className="btn btn-ghost btn-sm" title="Favourite" onClick={() => api.patchMany(ids, { favourite: true }, "favourited")}><Star size={14} /><span className="hidden sm:inline">Favourite</span></button>
-      <button type="button" className="btn btn-ghost btn-sm" title="Mark read" onClick={() => api.patchMany(ids, { readAt: new Date().toISOString() }, "marked read")}><BookOpen size={14} /><span className="hidden sm:inline">Read</span></button>
+      <button type="button" className="btn btn-ghost btn-sm" title="Favourite" onClick={() => api.patchMany(ids, { favourite: true }, "favourited")}><Star size={14} /><span className="hidden md:inline">Favourite</span></button>
+      <button type="button" className="btn btn-ghost btn-sm" title="Mark read" onClick={() => api.patchMany(ids, { readAt: new Date().toISOString() }, "marked read")}><BookOpen size={14} /><span className="hidden md:inline">Read</span></button>
       <MenuRoot>
-        <MenuTrigger asChild><button type="button" className="btn btn-ghost btn-sm" title="Move to collection"><FolderInput size={14} /><span className="hidden sm:inline">Move</span></button></MenuTrigger>
+        <MenuTrigger asChild><button type="button" className="btn btn-ghost btn-sm" title="Move to collection"><FolderInput size={14} /><span className="hidden md:inline">Move</span></button></MenuTrigger>
         <MenuContent side="top">
           <MenuItem onSelect={() => api.patchMany(ids, { collectionId: null }, "unsorted")}>Unsorted</MenuItem>
           {collections.map((c) => <MenuItem key={c.id} onSelect={() => api.patchMany(ids, { collectionId: c.id }, `moved to ${c.name}`)}>{c.name}</MenuItem>)}
         </MenuContent>
       </MenuRoot>
       {tag === null ? (
-        <button type="button" className="btn btn-ghost btn-sm" title="Add tag" onClick={() => setTag("")}><Tag size={14} /><span className="hidden sm:inline">Tag</span></button>
+        <button type="button" className="btn btn-ghost btn-sm" title="Add tag" onClick={() => setTag("")}><Tag size={14} /><span className="hidden md:inline">Tag</span></button>
       ) : (
         <input
           autoFocus
@@ -40,11 +40,11 @@ export function BulkBar({ onExport }: { onExport: () => void }) {
           }}
         />
       )}
-      <button type="button" className="btn btn-ghost btn-sm" title="Check links" onClick={() => api.checkHealth(ids)}><HeartPulse size={14} /><span className="hidden sm:inline">Check</span></button>
-      <button type="button" className="btn btn-ghost btn-sm" title="Export selection" onClick={onExport}><Download size={14} /><span className="hidden sm:inline">Export</span></button>
-      <button type="button" className="btn btn-ghost btn-sm" title="Archive" onClick={() => api.patchMany(ids, { archivedAt: new Date().toISOString() }, "archived")}><Archive size={14} /><span className="hidden sm:inline">Archive</span></button>
-      <button type="button" className="btn btn-ghost btn-sm text-danger" title="Delete" onClick={() => api.remove(ids)}><Trash2 size={14} /><span className="hidden sm:inline">Delete</span></button>
-      <button type="button" className="btn btn-ghost btn-icon h-7 w-7" aria-label="Clear selection" onClick={() => api.dispatch({ type: "select", ids: [], mode: "set" })}><X size={14} /></button>
+      <button type="button" className="btn btn-ghost btn-sm" title="Check links" onClick={() => api.checkHealth(ids)}><HeartPulse size={14} /><span className="hidden md:inline">Check</span></button>
+      <button type="button" className="btn btn-ghost btn-sm" title="Export selection" onClick={onExport}><Download size={14} /><span className="hidden md:inline">Export</span></button>
+      <button type="button" className="btn btn-ghost btn-sm" title="Archive" onClick={() => api.patchMany(ids, { archivedAt: new Date().toISOString() }, "archived")}><Archive size={14} /><span className="hidden md:inline">Archive</span></button>
+      <button type="button" className="btn btn-ghost btn-sm text-danger" title="Delete" onClick={() => api.remove(ids)}><Trash2 size={14} /><span className="hidden md:inline">Delete</span></button>
+      <button type="button" className="btn btn-ghost btn-icon sticky right-0 ml-auto h-7 w-7 bg-surface" aria-label="Clear selection" onClick={() => api.dispatch({ type: "select", ids: [], mode: "set" })}><X size={14} /></button>
     </div>
   )
 }
