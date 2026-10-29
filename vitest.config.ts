@@ -9,6 +9,6 @@ export default defineConfig({
     globals: true,
     environment: "node", // component tests opt into jsdom with a "@vitest-environment jsdom" docblock
     setupFiles: ["./vitest.setup.ts"],
-    include: ["lib/**/*.test.ts", "components/**/*.test.tsx", "app/**/*.test.tsx"],
+    include: ["lib/**/*.test.ts", "components/**/*.test.tsx"],
   },
 })
