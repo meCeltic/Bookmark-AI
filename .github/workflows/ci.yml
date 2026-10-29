@@ -26,3 +26,24 @@ jobs:
         env:
           # The build must succeed with no secrets: that is the demo-only deployment.
           NEXT_PUBLIC_SITE_URL: https://example.com
+
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pg
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update -q && sudo apt-get install -y -q postgresql-client
+      # Applies the migration as-is and checks RLS, the unique index, search and the trigger.
+      - run: scripts/db-smoke.sh
+        env:
+          DATABASE_URL: postgres://postgres:pg@localhost:5432/postgres

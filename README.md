@@ -84,6 +84,11 @@ Open http://localhost:3000. With no env vars at all you get demo mode only, whic
 ```bash
 npm test          # vitest, ~270 tests, about a second
 npm run verify    # lint + typecheck + test + build, what CI runs
+
+# Apply the migration to a disposable Postgres and check RLS, the unique index,
+# search and the trigger as a non-superuser. CI runs this against a service container.
+docker run -d --name pg -e POSTGRES_PASSWORD=pg -p 5432:5432 postgres:16-alpine
+DATABASE_URL=postgres://postgres:pg@localhost:5432/postgres scripts/db-smoke.sh
 ```
 
 ## Layout
@@ -98,7 +103,8 @@ lib/enrich      HTML extraction, Gemini call, pipeline
 lib/search      filters, sorting, ranking
 lib/import      Netscape bookmarks.html parser
 lib/export      JSON and HTML writers
-supabase/       schema migration
+supabase/       schema migration and the SQL smoke test
+scripts/        db-smoke.sh
 ```
 
 ## Roadmap
