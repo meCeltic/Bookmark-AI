@@ -403,6 +403,7 @@ h1, h2, h3 {
   [data-editing="true"] .hover-reveal,
   .hover-reveal[aria-checked="true"],
   .hover-reveal[data-state="open"] { opacity: 1; }
+  .hover-reveal.touch-show { opacity: 1; }
   .select-slot .select-icon { opacity: 1; }
   .select-slot[data-selecting="true"] .select-icon { opacity: 0; }
   .select-slot .select-check { opacity: 0; }

@@ -9,6 +9,26 @@ import { cn, formatDate } from "@/lib/utils"
 import { Favicon } from "@/components/favicon"
 import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuSub, MenuTrigger } from "@/components/ui/menu"
 import { useDashboard } from "./provider"
+import { highlightRanges } from "@/lib/search/rank"
+
+/** Wrap the query words found in a title with <mark>. */
+function highlight(text: string, query: string) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter((w) => w.length >= 2)
+  if (!words.length) return text
+  const lower = text.toLowerCase()
+  const ranges: [number, number][] = []
+  for (const w of words) {
+    let at = lower.indexOf(w)
+    while (at !== -1) {
+      ranges.push([at, at + w.length - 1])
+      at = lower.indexOf(w, at + w.length)
+    }
+  }
+  if (!ranges.length) return text
+  return highlightRanges(text, ranges).map((seg, i) =>
+    seg.hit ? <mark key={i} className="rounded-[1px] bg-accent-soft text-ink">{seg.text}</mark> : <span key={i}>{seg.text}</span>,
+  )
+}
 
 interface Props {
   bookmark: Bookmark
@@ -65,7 +85,10 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
   const domain = domainOf(bookmark.url)
   const unread = bookmark.readAt === null && !bookmark.archivedAt
   const aiLabel =
-    bookmark.enrichment === "done" ? "AI summary" : bookmark.enrichment === "fallback" ? "From page metadata" : bookmark.enrichment === "failed" ? "Could not read this page" : "Reading page…"
+    bookmark.enrichment === "done" ? "AI summary" : bookmark.enrichment === "fallback" ? "From page metadata" : bookmark.enrichment === "failed" ? "Could not read this page" : pending ? "Reading page…" : "Not read yet"
+  const statusText =
+    bookmark.enrichment === "done" ? "ai summary" : bookmark.enrichment === "fallback" ? "page meta" : bookmark.enrichment === "failed" ? "unread page" : pending ? "reading" : "not read yet"
+  const title = highlight(bookmark.title, state.query)
 
   const menu = (
     <MenuRoot>
@@ -195,7 +218,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
       >
         {selectSlot}
         <div className="flex min-w-0 flex-1 items-baseline gap-3">
-          <a href={bookmark.url} onClick={(e) => e.preventDefault()} tabIndex={0} onFocus={onFocus} className={cn("truncate font-display text-[15px] font-medium outline-none", unread && "font-semibold")}>{bookmark.title}</a>
+          <a href={bookmark.url} onClick={(e) => e.preventDefault()} tabIndex={0} onFocus={onFocus} className={cn("truncate font-display text-[15px] font-medium outline-none", unread && "font-semibold")}>{title}</a>
           <span className="hidden truncate font-mono text-[11px] text-ink-3 sm:inline">{domain}</span>
         </div>
         <div className="hidden items-center gap-1.5 md:flex">{bookmark.tags.slice(0, 3).map((t) => <span key={t} className="stamp stamp-quiet pointer-events-none h-[18px]">{t}</span>)}</div>
@@ -245,7 +268,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
       <h3 className={cn("line-clamp-2 font-display text-[17px] font-semibold leading-snug", pending && "text-ink-2")}>
         {/* A real link, so Tab reaches every card and the URL shows in the status bar; the click is handled by the card. */}
         <a href={bookmark.url} onClick={(e) => e.preventDefault()} onFocus={onFocus} className="outline-none">
-          {pending && !bookmark.description ? <span className="caret">{bookmark.title}</span> : bookmark.title}
+          {pending && !bookmark.description ? <span className="caret">{bookmark.title}</span> : title}
         </a>
       </h3>
 
@@ -261,7 +284,7 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
 
       <footer className="card-actions mt-auto flex h-8 items-center gap-1 border-t border-border" data-focused={focused}>
         <span className={cn("font-mono text-[10.5px] uppercase tracking-[0.06em]", bookmark.enrichment === "done" ? "text-accent" : "text-ink-3")} title={aiLabel}>
-          {bookmark.enrichment === "done" ? "ai summary" : bookmark.enrichment === "fallback" ? "page meta" : bookmark.enrichment === "failed" ? "unread page" : "reading"}
+          {statusText}
           {bookmark.readingMinutes ? <span className="text-ink-3"> · {bookmark.readingMinutes} min</span> : null}
         </span>
         <span className="card-buttons ml-auto flex items-center">

@@ -348,10 +348,17 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       await Promise.all([worker(), worker()])
     } finally {
       readingRef.current = false
-      if (stopped) toast.error(`Read ${done} pages, then hit the limit. Run "Read pending pages" again in a minute.`, { id: toastId })
-      else toast.success(`Read ${done} ${done === 1 ? "page" : "pages"}`, { id: toastId })
+      if (stopped) {
+        // The limiter refills within a minute; pick the queue back up on its own.
+        toast(`Read ${done} pages, then hit the limit. The rest continue in a minute.`, { id: toastId, duration: 8000 })
+        window.setTimeout(() => void readPendingRef.current?.(), 65_000)
+      } else toast.success(`Read ${done} ${done === 1 ? "page" : "pages"}`, { id: toastId })
     }
   }, [enrich])
+  const readPendingRef = useRef<DashboardApi["readPending"] | null>(null)
+  useEffect(() => {
+    readPendingRef.current = readPending
+  }, [readPending])
 
   const addBookmark = useCallback<DashboardApi["addBookmark"]>(
     async (raw, opts) => {
@@ -614,7 +621,10 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     async (items) => {
       const existing = new Set(state.bookmarks.map((b) => b.urlNormalized))
       const { fresh, skipped } = dedupeImports(items, existing, canonicalKey)
-      if (!fresh.length) return { created: 0, skipped }
+      if (!fresh.length) {
+        toast("Everything in that file was already saved.")
+        return { created: 0, skipped }
+      }
       const progress = toast.loading(`Filing ${fresh.length} cards…`)
       // "Bookmarks bar / Rust / Async" keeps nesting visible as one collection name.
       const folderName = (item: ImportedBookmark) => item.folder.map((f) => f.trim()).filter(Boolean).join(" / ").slice(0, 60)
@@ -642,13 +652,19 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
         enrichment: "pending",
       }))
       const result = await repo.importBookmarks(inputs)
-      toast.dismiss(progress)
       if (!result.ok) {
-        toast.error(result.error.message)
+        toast.error(result.error.message, { id: progress })
         return { created: 0, skipped }
       }
       dispatch({ type: "upsertMany", bookmarks: result.data.created })
-      return { created: result.data.created.length, skipped: skipped + result.data.skipped }
+      const created = result.data.created.length
+      const totalSkipped = skipped + result.data.skipped
+      // Replace the loading toast in place; a dismiss can race the next render and stick.
+      toast.success(
+        created ? `Filed ${created} ${created === 1 ? "card" : "cards"}${totalSkipped ? `, skipped ${totalSkipped} already saved` : ""}` : "Everything in that file was already saved.",
+        { id: progress },
+      )
+      return { created, skipped: totalSkipped }
     },
     [repo, state.bookmarks, state.collections],
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, BookMarked, BookOpenText, Download, FolderPlus, Inbox, Library, LogOut, Settings, Star, Upload, HeartPulse, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Archive, BookMarked, BookOpenText, Download, FolderPlus, Inbox, Library, LogOut, RotateCcw, Settings, Star, Upload, HeartPulse, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { useState, type ReactNode } from "react"
 import type { SystemView } from "@/lib/domain/bookmark"
@@ -33,6 +33,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [tagEdit, setTagEdit] = useState<{ from: string; to: string } | null>(null)
   const [allTags, setAllTags] = useState(false)
+  const deadCount = state.bookmarks.filter((b) => b.health === "dead" && !b.archivedAt).length
 
   const select = (view: typeof state.view) => {
     api.dispatch({ type: "view", view })
@@ -65,6 +66,18 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
           )
         })}
       </nav>
+
+      {deadCount > 0 ? (
+        <button
+          type="button"
+          onClick={() => { api.dispatch({ type: "view", view: { kind: "view", view: "all" } }); api.dispatch({ type: "healthFilter", value: "dead" }); onNavigate?.() }}
+          className={cn("mx-2 mt-1 flex w-[calc(100%-16px)] items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-left text-[14px] transition-colors hover:bg-surface", state.healthFilter === "dead" && "bg-surface font-semibold")}
+        >
+          <span className={cn("text-ink-2", state.healthFilter === "dead" && "text-danger")}><HeartPulse size={15} /></span>
+          Dead links
+          <span className="ml-auto font-mono text-[11px] text-danger">{deadCount}</span>
+        </button>
+      ) : null}
 
       <div className="mt-5 flex items-center justify-between px-4">
         <span className="meta">Collections</span>
@@ -103,7 +116,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
                   </button>
                   <MenuRoot>
                     <MenuTrigger asChild>
-                      <button type="button" className="hover-reveal btn btn-ghost btn-icon mr-1 h-6 w-6" aria-label={`Options for ${c.name}`}>
+                      <button type="button" className="hover-reveal touch-show btn btn-ghost btn-icon mr-1 h-6 w-6" aria-label={`Options for ${c.name}`}>
                         <MoreHorizontal size={13} />
                       </button>
                     </MenuTrigger>
@@ -181,7 +194,7 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
                   </button>
                   <MenuRoot>
                     <MenuTrigger asChild>
-                      <button type="button" className="hover-reveal btn btn-ghost btn-icon mr-1 h-6 w-6" aria-label={`Options for tag ${tag}`}>
+                      <button type="button" className="hover-reveal touch-show btn btn-ghost btn-icon mr-1 h-6 w-6" aria-label={`Options for tag ${tag}`}>
                         <MoreHorizontal size={13} />
                       </button>
                     </MenuTrigger>
@@ -209,6 +222,9 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
         <SideAction icon={<HeartPulse size={14} />} label="Check links" onClick={() => api.checkHealth()} />
         <SideAction icon={<Upload size={14} />} label="Import bookmarks" onClick={onImport} />
         <SideAction icon={<Download size={14} />} label="Export" onClick={onExport} />
+        {api.mode === "demo" ? (
+          <SideAction icon={<RotateCcw size={14} />} label="Reset demo" onClick={() => api.resetDemo()} />
+        ) : null}
         {api.mode === "cloud" ? (
           <Link href="/settings" className="flex w-full items-center gap-2.5 rounded-[2px] px-2 py-1.5 text-[13.5px] text-ink-2 hover:bg-surface hover:text-ink">
             <Settings size={14} /> Settings

@@ -1,7 +1,7 @@
 "use client"
 
 import { Command } from "cmdk"
-import { Archive, ArrowDownUp, BookMarked, BookOpenText, Download, ExternalLink, FolderPlus, HeartPulse, Inbox, LayoutGrid, Library, Moon, Plus, Rows3, Star, Sun, Upload, Keyboard, Tag } from "lucide-react"
+import { Archive, ArrowDownUp, BookMarked, BookOpenText, RotateCcw, Download, ExternalLink, FolderPlus, HeartPulse, Inbox, LayoutGrid, Library, Moon, Plus, Rows3, Star, Sun, Upload, Keyboard, Tag } from "lucide-react"
 import { SORT_ORDERS, type SortOrder } from "@/lib/domain/bookmark"
 import { useTheme } from "next-themes"
 import { useEffect, useMemo, useState } from "react"
@@ -117,6 +117,12 @@ export function CommandPalette({ open, onOpenChange, onImport, onExport, onHelp 
                     <Item onSelect={run(() => void api.readPending())}><BookOpenText size={14} /> Read {api.pendingCount} pending pages</Item>
                   ) : null}
                   <Item onSelect={run(() => void api.checkHealth())}><HeartPulse size={14} /> Check links in this view</Item>
+                  {state.bookmarks.some((b) => b.health === "dead" && !b.archivedAt) ? (
+                    <Item onSelect={run(() => { api.dispatch({ type: "view", view: { kind: "view", view: "all" } }); api.dispatch({ type: "healthFilter", value: "dead" }) })}><HeartPulse size={14} /> Show dead links</Item>
+                  ) : null}
+                  {api.mode === "demo" ? (
+                    <Item onSelect={run(() => void api.resetDemo())}><RotateCcw size={14} /> Reset demo</Item>
+                  ) : null}
                   <Item onSelect={run(onImport)}><Upload size={14} /> Import bookmarks</Item>
                   <Item onSelect={run(onExport)}><Download size={14} /> Export</Item>
                   <Item onSelect={run(() => api.dispatch({ type: "layout", layout: state.layout === "grid" ? "list" : "grid" }))}>

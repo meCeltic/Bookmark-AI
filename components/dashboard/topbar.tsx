@@ -3,7 +3,7 @@
 import { ArrowDownUp, Command, LayoutGrid, Menu, Rows3, Search, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { SORT_ORDERS, type SortOrder } from "@/lib/domain/bookmark"
-import { normalizeUrl } from "@/lib/url/normalize"
+import { domainOf, normalizeUrl } from "@/lib/url/normalize"
 import { cn, isMac } from "@/lib/utils"
 import { useMounted } from "@/lib/client/use-mounted"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -36,7 +36,8 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
   // Debounce the search query; URLs never hit the search.
   useEffect(() => {
     if (looksLikeUrl) {
-      api.dispatch({ type: "query", query: "" })
+      // Show what is already filed from that site while the Save button is up.
+      api.dispatch({ type: "query", query: domainOf(normalizeUrl(draft.trim()) ?? "") })
       return
     }
     const t = setTimeout(() => api.dispatch({ type: "query", query: draft }), 120)

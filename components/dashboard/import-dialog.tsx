@@ -41,15 +41,15 @@ export function ImportDialog({ open, onOpenChange }: Props) {
   const confirm = async () => {
     if (!items) return
     setBusy(true)
-    const { created, skipped } = await api.importItems(items)
+    const { created } = await api.importItems(items)
     setBusy(false)
     onOpenChange(false)
     setItems(null)
-    toast.success(created ? `Filed ${created} ${created === 1 ? "card" : "cards"}${skipped ? `, skipped ${skipped} already saved` : ""}` : "Everything in that file was already saved.")
     if (created) void api.readPending()
   }
 
-  const folders = items ? new Set(items.map((i) => i.folder[0]).filter(Boolean)).size : 0
+  const folderOf = (i: ImportedBookmark) => i.folder.map((f) => f.trim()).filter(Boolean).join(" / ")
+  const folders = items ? new Set(items.map(folderOf).filter(Boolean)).size : 0
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setItems(null) }}>
@@ -78,7 +78,7 @@ export function ImportDialog({ open, onOpenChange }: Props) {
                 {items.slice(0, 50).map((i, n) => (
                   <li key={n} className="flex items-center gap-2 px-3 py-1.5">
                     <span className="truncate">{i.title}</span>
-                    {i.folder[0] ? <span className="ml-auto shrink-0 font-mono text-[10.5px] text-ink-3">{i.folder[0]}</span> : null}
+                    {folderOf(i) ? <span className="ml-auto shrink-0 truncate font-mono text-[10.5px] text-ink-3">{folderOf(i)}</span> : null}
                   </li>
                 ))}
                 {items.length > 50 ? <li className="px-3 py-1.5 font-mono text-[11px] text-ink-3">…and {items.length - 50} more</li> : null}
