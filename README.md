@@ -78,7 +78,7 @@ Open http://localhost:3000. With no env vars at all you get demo mode only, whic
 | Variable | Needed for |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Accounts and cloud sync. Run `supabase/migrations/0001_init.sql` in the SQL editor first. |
-| `GEMINI_API_KEY` (`GEMINI_MODEL` optional) | AI summaries and tags. The free tier at aistudio.google.com is enough. Without it, cards use the page description. |
+| `GEMINI_API_KEY` (`GEMINI_MODEL` optional) | AI summaries and tags. The free tier at aistudio.google.com is enough. Models are tried in a chain (lite first, then larger) and a 404, 429, 503 or timeout moves to the next; without a key, cards use the page description. |
 | `NEXT_PUBLIC_SITE_URL` | Absolute links in auth emails. |
 
 ```bash

@@ -24,14 +24,20 @@ export interface AiInput {
 
 export interface GeminiConfig {
   apiKey: string
-  model: string
+  /** Tried in order; the next one is used on a 404, 429, 503 or timeout. */
+  models: string[]
   timeoutMs: number
 }
+
+/** Lite first: a bookmark summary does not need the big model, and lite answers in about a second. */
+export const DEFAULT_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
 
 export function geminiConfigFromEnv(): GeminiConfig | null {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return null
-  return { apiKey, model: process.env.GEMINI_MODEL || "gemini-2.5-flash", timeoutMs: 15_000 }
+  const fromEnv = (process.env.GEMINI_MODEL ?? "").split(",").map((m) => m.trim()).filter(Boolean)
+  const models = [...new Set([...fromEnv, ...DEFAULT_MODELS])]
+  return { apiKey, models, timeoutMs: 15_000 }
 }
 
 const RESPONSE_SCHEMA = {
@@ -64,23 +70,42 @@ export function buildPrompt(input: AiInput): string {
     .join("\n")
 }
 
+/** Errors worth trying the next model for: missing model, quota, overload, timeout. */
+export function isRetryable(error: unknown): boolean {
+  const text = error instanceof Error ? `${error.name} ${error.message}` : String(error)
+  return /\b(404|429|503)\b|NOT_FOUND|RESOURCE_EXHAUSTED|UNAVAILABLE|high demand|AbortError|aborted|timeout/i.test(text)
+}
+
 export async function summarizeWithGemini(
   input: AiInput,
   config: GeminiConfig,
   client: GoogleGenAI = new GoogleGenAI({ apiKey: config.apiKey }),
 ): Promise<AiOutput | null> {
-  const response = await client.models.generateContent({
-    model: config.model,
-    contents: buildPrompt(input),
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA,
-      temperature: 0.2,
-      maxOutputTokens: 400,
-      abortSignal: AbortSignal.timeout(config.timeoutMs),
-    },
-  })
-  return parseAiOutput(response.text)
+  const prompt = buildPrompt(input)
+  let lastError: unknown = null
+  // Each model gets two tries: an overloaded model often answers a second later.
+  const attempts = config.models.flatMap((model) => [model, model])
+  for (const [i, model] of attempts.entries()) {
+    if (i % 2 === 1) await new Promise((r) => setTimeout(r, 1200))
+    try {
+      const response = await client.models.generateContent({
+        model,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: RESPONSE_SCHEMA,
+          temperature: 0.2,
+          maxOutputTokens: 1024,
+          abortSignal: AbortSignal.timeout(config.timeoutMs),
+        },
+      })
+      return parseAiOutput(response.text)
+    } catch (error) {
+      lastError = error
+      if (!isRetryable(error)) throw error
+    }
+  }
+  throw lastError ?? new Error("no model answered")
 }
 
 /** Exported for tests: malformed or off-schema output becomes null, never a throw. */

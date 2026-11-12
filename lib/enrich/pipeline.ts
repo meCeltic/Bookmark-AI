@@ -3,6 +3,7 @@ import { ok, type Result } from "@/lib/domain/result"
 import { safeFetch } from "@/lib/url/ssrf-guard"
 import { extractPage, type ExtractedPage } from "./extract"
 import { geminiConfigFromEnv, summarizeWithGemini, type AiOutput } from "./gemini"
+import { describeError, logger } from "@/lib/log"
 
 /**
  * url -> guarded fetch -> extract -> (Gemini | metadata) -> validated Enrichment.
@@ -55,8 +56,10 @@ export async function enrichUrl(url: string, deps: PipelineDeps = defaultDeps())
       if (ai) {
         return ok(enrichmentSchema.parse({ ...base, summary: ai.summary, tags: ai.tags, category: ai.category, source: "ai" }))
       }
-    } catch {
-      // Quota, network, or a refusal: fall through to metadata. The status tells the UI.
+    } catch (error) {
+      // Quota, network, a retired model or a refusal: fall through to metadata.
+      // The card's status tells the user; the log tells the operator why.
+      logger({ scope: "enrich" }).warn("model call failed, using metadata", describeError(error))
     }
   }
 
