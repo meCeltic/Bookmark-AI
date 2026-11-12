@@ -42,8 +42,13 @@ export async function signUpAction(_prev: AuthState, form: FormData): Promise<Au
     password: parsed.data.password,
     options: { emailRedirectTo: `${siteUrl()}/auth/callback?next=/dashboard` },
   })
-  // One generic message: the specific Supabase text would reveal whether the address is registered.
-  if (error) return { error: "Could not create the account with those details." }
+  // Address and password problems are safe to name; anything else stays generic so the
+  // message never reveals whether an address is already registered.
+  if (error) {
+    if (error.code === "email_address_invalid") return { error: "That email address was rejected. Try another one." }
+    if (error.code === "weak_password") return { error: "Pick a stronger password." }
+    return { error: "Could not create the account with those details." }
+  }
   if (data.session) redirect("/dashboard")
   return { notice: "Check your inbox. The link in the email finishes creating the account." }
 }
