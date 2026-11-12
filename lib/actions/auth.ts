@@ -47,6 +47,9 @@ export async function signUpAction(_prev: AuthState, form: FormData): Promise<Au
   if (error) {
     if (error.code === "email_address_invalid") return { error: "That email address was rejected. Try another one." }
     if (error.code === "weak_password") return { error: "Pick a stronger password." }
+    if (error.code === "over_email_send_rate_limit") {
+      return { error: "Too many sign-up emails were sent recently. Try again in about an hour, or use the demo meanwhile." }
+    }
     return { error: "Could not create the account with those details." }
   }
   if (data.session) redirect("/dashboard")
