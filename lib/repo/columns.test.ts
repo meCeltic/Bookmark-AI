@@ -31,3 +31,22 @@ describe("repository column lists", () => {
     expect(COLLECTION_COLUMNS.split(",").sort()).toEqual(columnsOf("collections").sort())
   })
 })
+
+describe("rowToBookmark", () => {
+  it("accepts Postgres timestamps with an offset and normalises them to Z", async () => {
+    const { rowToBookmark } = await import("./supabase")
+    const b = rowToBookmark({
+      id: "11111111-1111-1111-1111-111111111111",
+      url: "https://a.com",
+      url_normalized: "https://a.com",
+      title: "A",
+      tags: [],
+      created_at: "2026-11-12T14:25:14.19612+00:00",
+      updated_at: "2026-11-12T14:25:14.19612+00:00",
+      read_at: "2026-11-12T15:00:00+05:30",
+    })
+    expect(b.createdAt).toBe("2026-11-12T14:25:14.196Z")
+    expect(b.readAt).toBe("2026-11-12T09:30:00.000Z")
+    expect(b.archivedAt).toBeNull()
+  })
+})

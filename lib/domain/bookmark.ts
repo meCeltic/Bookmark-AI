@@ -49,15 +49,15 @@ export const bookmarkSchema = z.object({
   imageUrl: z.url().nullable(),
   collectionId: z.string().nullable(),
   favourite: z.boolean(),
-  readAt: z.iso.datetime().nullable(),
-  archivedAt: z.iso.datetime().nullable(),
+  readAt: z.iso.datetime({ offset: true }).nullable(),
+  archivedAt: z.iso.datetime({ offset: true }).nullable(),
   enrichment: z.enum(ENRICHMENT_STATUSES),
   readingMinutes: z.number().int().min(0).max(600).nullable(),
   health: z.enum(LINK_HEALTH),
-  healthCheckedAt: z.iso.datetime().nullable(),
-  lastOpenedAt: z.iso.datetime().nullable(),
-  createdAt: z.iso.datetime(),
-  updatedAt: z.iso.datetime(),
+  healthCheckedAt: z.iso.datetime({ offset: true }).nullable(),
+  lastOpenedAt: z.iso.datetime({ offset: true }).nullable(),
+  createdAt: z.iso.datetime({ offset: true }),
+  updatedAt: z.iso.datetime({ offset: true }),
 })
 export type Bookmark = z.infer<typeof bookmarkSchema>
 
@@ -73,11 +73,11 @@ export const newBookmarkSchema = z.object({
   imageUrl: z.url().nullable().optional(),
   collectionId: z.string().nullable().optional(),
   favourite: z.boolean().optional(),
-  readAt: z.iso.datetime().nullable().optional(),
-  archivedAt: z.iso.datetime().nullable().optional(),
+  readAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  archivedAt: z.iso.datetime({ offset: true }).nullable().optional(),
   enrichment: z.enum(ENRICHMENT_STATUSES).optional(),
   readingMinutes: z.number().int().min(0).max(600).nullable().optional(),
-  createdAt: z.iso.datetime().optional(),
+  createdAt: z.iso.datetime({ offset: true }).optional(),
 })
 export type NewBookmark = z.infer<typeof newBookmarkSchema>
 
@@ -90,7 +90,7 @@ export const collectionSchema = z.object({
   id: z.string().min(1),
   name: z.string().trim().min(1).max(60),
   position: z.number().int(),
-  createdAt: z.iso.datetime(),
+  createdAt: z.iso.datetime({ offset: true }),
 })
 export type Collection = z.infer<typeof collectionSchema>
 

@@ -36,7 +36,10 @@ function failInternal<T>(error: { message: string; code?: string }): Result<T> {
   return fail("INTERNAL", "Something went wrong saving that. Please try again.")
 }
 
-function rowToBookmark(row: Row): Bookmark {
+/** Postgres hands back "+00:00" offsets; the app stores and compares "Z" strings. */
+const iso = (value: unknown): string | null => (typeof value === "string" ? new Date(value).toISOString() : null)
+
+export function rowToBookmark(row: Row): Bookmark {
   return bookmarkSchema.parse({
     id: row.id,
     url: row.url,
@@ -50,15 +53,15 @@ function rowToBookmark(row: Row): Bookmark {
     imageUrl: row.image_url ?? null,
     collectionId: row.collection_id ?? null,
     favourite: row.favourite ?? false,
-    readAt: row.read_at ?? null,
-    archivedAt: row.archived_at ?? null,
+    readAt: iso(row.read_at),
+    archivedAt: iso(row.archived_at),
     enrichment: row.enrichment ?? "pending",
     readingMinutes: row.reading_minutes ?? null,
     health: row.health ?? "unknown",
-    healthCheckedAt: row.health_checked_at ?? null,
-    lastOpenedAt: row.last_opened_at ?? null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    healthCheckedAt: iso(row.health_checked_at),
+    lastOpenedAt: iso(row.last_opened_at),
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
   })
 }
 
@@ -120,7 +123,7 @@ function rowToCollection(row: Row): Collection {
     id: row.id,
     name: row.name,
     position: row.position ?? 0,
-    createdAt: row.created_at,
+    createdAt: iso(row.created_at),
   })
 }
 
