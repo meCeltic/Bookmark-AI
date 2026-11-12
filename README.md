@@ -4,7 +4,7 @@ Save a page. Get it back with one word.
 
 Paste a link and Bookmark-AI reads the page, writes a two-line summary, stamps a few tags and files the card. Months later you type the one word you remember and it is back on the desk.
 
-**Live demo:** https://bookmark-ai.vercel.app/demo (no account needed; demo cards stay in your browser, only the URL you paste goes to the server to be read)
+**Live demo:** https://bookmark-ai-beta.vercel.app/demo (no account needed; demo cards stay in your browser, only the URL you paste goes to the server to be read)
 
 [![ci](https://github.com/meCeltic/Bookmark-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/meCeltic/Bookmark-AI/actions/workflows/ci.yml)
 
