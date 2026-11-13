@@ -23,38 +23,44 @@ export default function Home() {
       </header>
 
       <main>
-        <section className="pb-16 pt-14 sm:pb-20 sm:pt-24">
-          {/* Inline weight/tracking: the unlayered h1 rule in globals.css would beat utility classes. */}
-          <h1
-            className="isolate max-w-[12ch] text-[clamp(56px,8.5vw,132px)] leading-[0.92]"
-            style={{ fontWeight: 900, letterSpacing: "-0.04em" }}
+        {/* lg+: hero copy left (7/12), the live strip right (5/12) top-aligned with the second headline line. */}
+        <div className="lg:grid lg:grid-cols-12 lg:gap-x-8 [--h1:clamp(56px,8.5vw,132px)] lg:[--h1:clamp(64px,6.6vw,96px)]">
+          <section className="pb-16 pt-14 sm:pb-20 sm:pt-24 lg:col-span-7">
+            {/* Inline weight/tracking: the unlayered h1 rule in globals.css would beat utility classes. */}
+            <h1
+              className="isolate max-w-[12ch] text-[length:var(--h1)] leading-[0.92]"
+              style={{ fontWeight: 900, letterSpacing: "-0.04em" }}
+            >
+              Save it now. Find it with <Mark animate>one word</Mark>.
+            </h1>
+            <p className="mt-6 max-w-[46ch] text-[16px] leading-relaxed text-ink-2 sm:text-[17px]">
+              Paste a link and Bookmark-AI writes the summary and tags, so the page is there when you need it again.
+            </p>
+            <div className="mt-8">
+              <TrySave />
+              <Link href="/demo" className="mt-4 inline-block text-[15px] text-ink-2 hover:text-action">
+                or open the demo with 22 saved pages &rarr;
+              </Link>
+            </div>
+          </section>
+
+          <section
+            className="border-t border-line py-14 sm:py-20 lg:col-span-5 lg:mt-[calc(6rem+0.92*var(--h1)+0.12*var(--h1))] lg:self-start lg:border-t-0 lg:py-0"
+            aria-labelledby="find-heading"
           >
-            Save it now. Find it with <Mark animate>one word</Mark>.
-          </h1>
-          <p className="mt-6 max-w-[46ch] text-[16px] leading-relaxed text-ink-2 sm:text-[17px]">
-            Paste a link and Bookmark-AI writes the summary and tags, so the page is there when you need it again.
-          </p>
-          <div className="mt-8">
-            <TrySave />
-            <Link href="/demo" className="mt-4 inline-block text-[15px] text-ink-2 hover:text-action">
-              or open the demo with 22 saved pages &rarr;
-            </Link>
-          </div>
-        </section>
-
-        <section className="border-t border-line py-14 sm:py-20" aria-labelledby="find-heading">
-          <h2 id="find-heading" className="text-[32px] font-extrabold tracking-[-0.03em]">Find it again</h2>
-          <p className="mt-2 max-w-[52ch] text-[15px] text-ink-2">Months later, one word you remember is enough.</p>
-          <div className="mt-8">
+            <div className="mb-8 lg:sr-only">
+              <h2 id="find-heading" className="text-[32px] font-extrabold tracking-[-0.03em]">Find it again</h2>
+              <p className="mt-2 max-w-[52ch] text-[15px] text-ink-2">Months later, one word you remember is enough.</p>
+            </div>
             <FindStrip />
-          </div>
-        </section>
+          </section>
+        </div>
 
-        <section className="border-t border-line py-14 sm:py-20">
-          <p className="max-w-[34ch] font-summary text-[24px] italic leading-snug text-ink-2 sm:text-[28px]">
-            You&rsquo;ll forget why you saved it. It won&rsquo;t.
+        <section className="py-14 sm:py-20 lg:pl-[calc((100%-11*2rem)/12*2+2*2rem)]">
+          <p className="max-w-[30ch] text-balance font-summary text-[clamp(36px,4vw,56px)] font-normal italic leading-[1.1] tracking-[-0.01em] text-ink">
+            You&rsquo;ll forget why you saved it.<br className="hidden sm:inline" /> It won&rsquo;t.
           </p>
-          <p className="mt-4 text-[13px] text-ink-3">
+          <p className="mt-5 text-[13px] text-ink-3">
             Summary and tags on save · search by any word · collections · import and export
           </p>
         </section>
@@ -76,15 +82,17 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="mx-auto flex w-full max-w-[1120px] flex-col gap-2 px-4 py-6 sm:px-8 text-[13px] text-ink-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-6">
-        <p>
-          Next.js · Supabase Postgres (row-level security) · Gemini ·{" "}
-          <a href={`${REPO}#how-it-works`} className={`${link} whitespace-nowrap`}>How it works &rarr;</a> ·{" "}
-          <a href={REPO} className={link}>Source</a>
-        </p>
-        <p>
-          Built by <a href="https://github.com/meCeltic" className={link}>Ankit Singh</a>
-        </p>
+      <footer className="mx-auto w-full max-w-[1120px] px-4 sm:px-8">
+        <div className="flex flex-col gap-2 py-6 text-[13px] text-ink-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-6">
+          <p>
+            Next.js · Supabase Postgres (row-level security) · Gemini ·{" "}
+            <a href={`${REPO}#how-it-works`} className={`${link} whitespace-nowrap`}>How it works &rarr;</a> ·{" "}
+            <a href={REPO} className={link}>Source</a>
+          </p>
+          <p>
+            Built by <a href="https://github.com/meCeltic" className={link}>Ankit Singh</a>
+          </p>
+        </div>
       </footer>
     </div>
   )
