@@ -4,20 +4,32 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Mark } from "@/components/mark"
 import { TrySave } from "@/components/landing/try-save"
 import { FindStrip } from "@/components/landing/find-strip"
+import { getSessionUser } from "@/lib/supabase/server"
+import { signOutAction } from "@/lib/actions/auth"
 
 const REPO = "https://github.com/meCeltic/Bookmark-AI"
 
 const link = "underline decoration-line-strong underline-offset-4 hover:text-action hover:decoration-current"
 
-export default function Home() {
+export default async function Home() {
+  const user = await getSessionUser()
   return (
     <div className="overflow-x-clip">
       <div className="mx-auto w-full max-w-[1120px] px-4 sm:px-8">
       <header className="flex h-16 items-center justify-between gap-4">
         <Wordmark />
         <nav className="flex items-center gap-4 text-[14px] font-medium text-ink-2 sm:gap-5">
-          <Link href="/demo" className="hover:text-ink">Demo</Link>
-          <Link href="/login" className="hover:text-ink">Sign in</Link>
+          {user ? (
+            <>
+              <Link href="/dashboard" className="hover:text-ink">Dashboard</Link>
+              <form action={signOutAction}><button type="submit" className="hover:text-ink">Sign out</button></form>
+            </>
+          ) : (
+            <>
+              <Link href="/demo" className="hover:text-ink">Demo</Link>
+              <Link href="/login" className="hover:text-ink">Sign in</Link>
+            </>
+          )}
           <ThemeToggle className="-mr-2" />
         </nav>
       </header>
@@ -38,9 +50,15 @@ export default function Home() {
             </p>
             <div className="mt-8">
               <TrySave />
-              <Link href="/demo" className="mt-4 inline-block text-[15px] text-ink-2 hover:text-action">
-                or open the demo with 22 saved pages &rarr;
-              </Link>
+              {user ? (
+                <Link href="/dashboard" className="mt-4 inline-block text-[15px] text-ink-2 hover:text-action">
+                  or go to your Inbox &rarr;
+                </Link>
+              ) : (
+                <Link href="/demo" className="mt-4 inline-block text-[15px] text-ink-2 hover:text-action">
+                  or open the demo with 22 saved pages &rarr;
+                </Link>
+              )}
             </div>
           </section>
 
