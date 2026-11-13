@@ -298,19 +298,6 @@ mark {
   .card[data-focused="true"],
   .card[data-previewed="true"] { border-color: var(--ink); }
 
-  /* Favourite: a folded yellow corner, top-right. */
-  .fold {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 0;
-    height: 0;
-    border-top: 14px solid var(--mark);
-    border-left: 14px solid transparent;
-    border-top-right-radius: var(--radius-card);
-    pointer-events: none;
-  }
-
   /* Reading state: a hairline travels the top edge until the summary lands. */
   .reading {
     position: relative;
@@ -336,8 +323,12 @@ mark {
     transition: background-color 90ms var(--ease-enter);
   }
   /* One row is lit at a time: the focused one (hover moves focus while the mouse drives). */
-  .row[data-previewed="true"] { background: var(--surface-2); }
-  .row[data-focused="true"] { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--ink); }
+  /* Fill only, no rule: the mouse lights a row with surface-2; the keyboard's row (and the
+     previewed one when it is also focused) sits a step darker. */
+  .row[data-previewed="true"],
+  .row[data-focused="true"] { background: var(--surface-2); }
+  [data-keys] > .row[data-focused="true"],
+  .row[data-focused="true"][data-previewed="true"] { background: color-mix(in oklab, var(--surface-2) 94%, var(--ink)); }
   .row[data-selected="true"] { background: color-mix(in oklab, var(--action-soft) 60%, var(--surface)); }
   .row-list { grid-template-columns: 16px minmax(0, 1fr) 28px; }
 
@@ -629,7 +620,12 @@ mark {
     font-size: 15px;
   }
   .omni.field:hover { background: transparent; }
-  .omni.field:focus { background: transparent; border-color: transparent; box-shadow: inset 0 -2px 0 var(--action); }
+  /* The focus underline spans the field's contents: search icon to clear button, 12px in from each edge. */
+  .omni.field:focus {
+    background: linear-gradient(var(--action), var(--action)) no-repeat 12px 100% / calc(100% - 24px) 2px;
+    border-color: transparent;
+    box-shadow: none;
+  }
 }
 @media (min-width: 640px) and (hover: hover) {
   .row-touch-more { display: none; }

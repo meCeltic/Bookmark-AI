@@ -44,7 +44,7 @@ export function writePrefs(patch: Partial<Prefs>): Prefs {
 }
 
 /** One-time hints: a flag per name, remembered in this browser. */
-export type Flag = "saved-once" | "done-hint"
+export type Flag = "saved-once" | "done-hint" | "pane-keys"
 const FLAG_KEY = (name: Flag) => `bookmark-ai:flag:${name}`
 
 export function readFlag(name: Flag): boolean {

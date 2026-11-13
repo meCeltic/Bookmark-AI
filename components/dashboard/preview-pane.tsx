@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useSyncExternalStore } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import { ArchiveRestore, CheckCheck, ExternalLink, Star, X } from "lucide-react"
 import { domainOf } from "@/lib/url/normalize"
 import { cn, formatDate } from "@/lib/utils"
 import { usePresence } from "@/lib/client/use-presence"
+import { readFlag, writeFlag } from "@/lib/client/prefs"
 import { Favicon } from "@/components/favicon"
 import { useDashboard } from "./provider"
 import { CollectionSelect, TagEditor } from "./tag-editor"
@@ -39,6 +40,13 @@ export function PreviewPane() {
     const added = starSeen.id === bookmark.id && bookmark.favourite
     setStarSeen({ id: bookmark.id, fav: bookmark.favourite, pops: added ? starSeen.pops + 1 : starSeen.id === bookmark.id ? starSeen.pops : 0 })
   }
+  // The key hints show on the first open in this browser only; after that `?` has them all.
+  const [hints, setHints] = useState<boolean | null>(null)
+  if (bookmark && hints === null) setHints(!readFlag("pane-keys"))
+  if (!bookmark && hints) setHints(false)
+  useEffect(() => {
+    if (hints) writeFlag("pane-keys")
+  }, [hints])
   if (!bookmark) return null
   const starPop = starSeen.id === bookmark.id && starSeen.pops > 0 && bookmark.favourite
 
@@ -132,9 +140,11 @@ export function PreviewPane() {
             <CollectionSelect bookmark={bookmark} className="mt-3 -ml-0.5" />
           </div>
 
-          <p className="mt-6 hidden text-[12px] text-ink-3 lg:block">
-            <span className="kbd">j</span> <span className="kbd">k</span> next and previous · <span className="kbd">o</span> open · <span className="kbd">d</span> done · <span className="kbd">esc</span> close
-          </p>
+          {hints ? (
+            <p className="mt-6 hidden text-[12px] text-ink-3 lg:block">
+              <span className="kbd">j</span> <span className="kbd">k</span> next and previous · <span className="kbd">o</span> open · <span className="kbd">d</span> done · <span className="kbd">esc</span> close · <span className="kbd">?</span> all keys
+            </p>
+          ) : null}
         </div>
       </aside>
     </>

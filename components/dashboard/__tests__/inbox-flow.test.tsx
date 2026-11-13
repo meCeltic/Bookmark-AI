@@ -61,6 +61,17 @@ describe("Inbox flow", () => {
     expect(screen.getByRole("button", { name: /1 in Inbox/ })).toBeInTheDocument()
   })
 
+  it("search covers read cards still in the Inbox, folded or not, and counts them there", async () => {
+    await mountWithRepo(<DashboardShell userLabel="Demo" cloudAvailable={false} />, [
+      ...seed,
+      { url: "https://four.example/d", title: "Postgres vacuum", readAt: day(1), createdAt: day(4) },
+    ])
+    fireEvent.change(box(), { target: { value: "postgres" } })
+    await waitFor(() => expect(screen.getByText("2 in Inbox", { exact: false })).toBeInTheDocument())
+    expect(screen.getByRole("link", { name: /vacuum/ })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /1 in Done/ })).toBeInTheDocument()
+  })
+
   it("no placeholder shortcut and no paste hint while the Inbox has cards", async () => {
     await shell()
     expect(box().getAttribute("placeholder")).toBe("Search, #tag, or paste a link")
@@ -105,7 +116,7 @@ describe("Collection picker and tags", () => {
     const { container } = await mountWithRepo(<Probe />, [{ url: "https://x.example/", title: "X", tags: ["old"] }])
     await waitFor(() => expect(container.querySelector(".stamp-group")).not.toBeNull())
     expect(container.querySelector(".anim-stamp")).toBeNull()
-    // A dashed "+ tag" pill until clicked, then the input.
+    // A plain "+ tag" until clicked, then the input.
     expect(screen.queryByLabelText("Add a tag")).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "+ tag" }))
     const input = screen.getByLabelText("Add a tag")

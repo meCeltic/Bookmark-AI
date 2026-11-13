@@ -47,7 +47,18 @@ describe("IndexCard", () => {
     const { container } = await mountWithRepo(<BookmarkGrid />, [{ ...seed[0]!, favourite: true }])
     const star = screen.getByLabelText("Starred")
     expect(star).toHaveAttribute("fill", "var(--mark)")
+    expect(star).toHaveAttribute("stroke", "var(--ink)")
     expect(container.querySelector(".fold")).toBeNull()
+  })
+
+  it("shows a dead link in the meta column: the domain struck through and Dead", async () => {
+    const { container } = await mountWithRepo(<BookmarkGrid />, seed, async (repo) => {
+      const [b] = await repo.listBookmarks()
+      await repo.updateBookmark(b!.id, { health: "dead" })
+    })
+    const meta = container.querySelector(".row-slot .row-meta")!
+    expect(meta.textContent).toBe("postgresql.org · Dead")
+    expect(meta.querySelector(".line-through")).toHaveTextContent("postgresql.org")
   })
 
   it("folds the Read group in the Inbox into one line, unfolds on click and remembers it", async () => {
@@ -123,10 +134,11 @@ describe("IndexCard", () => {
     await waitFor(() => expect(screen.getByText("Couldn’t read this page")).toBeInTheDocument())
   })
 
-  it("shows the favourite as a folded corner", async () => {
+  it("shows the favourite as the same star in the card header, no folded corner", async () => {
     useGrid()
     const { container } = await mountWithRepo(<BookmarkGrid />, [{ ...seed[0]!, favourite: true }])
-    await waitFor(() => expect(container.querySelector(".fold")).not.toBeNull())
+    await waitFor(() => expect(container.querySelector("li.card header [aria-label='Starred']")).not.toBeNull())
+    expect(container.querySelector(".fold")).toBeNull()
   })
 
   it("Done marks the card read and archives it in one step", async () => {

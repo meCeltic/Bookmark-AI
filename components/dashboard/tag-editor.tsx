@@ -15,7 +15,7 @@ import { useDashboard } from "./provider"
 export function TagEditor({ bookmark, onEscape, className }: { bookmark: Bookmark; onEscape?: () => void; className?: string }) {
   const api = useDashboard()
   const [draft, setDraft] = useState("")
-  // A dashed "+ tag" pill until clicked; then the input, until it blurs empty.
+  // A plain "+ tag" until clicked; then the input, until it blurs empty.
   const [adding, setAdding] = useState(false)
   const [seen] = useState(() => new Set(bookmark.tags))
   const [typed, setTyped] = useState<Set<string>>(() => new Set())
@@ -42,7 +42,7 @@ export function TagEditor({ bookmark, onEscape, className }: { bookmark: Bookmar
       {adding ? (
         <input
           autoFocus
-          className="h-6 w-24 min-w-0 rounded-full border border-dashed border-line-strong bg-transparent px-2 text-[13px] outline-none placeholder:text-ink-3 focus:border-solid focus:border-action"
+          className="h-6 w-24 min-w-0 rounded-[4px] bg-surface-2 px-1.5 text-[13px] outline-none placeholder:text-ink-3 focus:shadow-[0_0_0_2px_var(--action)]"
           placeholder="tag"
           aria-label="Add a tag"
           maxLength={32}
@@ -61,7 +61,7 @@ export function TagEditor({ bookmark, onEscape, className }: { bookmark: Bookmar
       ) : (
         <button
           type="button"
-          className="inline-flex h-6 items-center rounded-full border border-dashed border-line-strong px-2 text-[13px] text-ink-3 transition-colors duration-[90ms] hover:border-ink-3 hover:text-ink"
+          className="inline-flex h-6 items-center text-[13px] text-ink-3 underline-offset-[3px] transition-colors duration-[90ms] hover:text-ink hover:underline"
           onClick={() => setAdding(true)}
         >
           + tag

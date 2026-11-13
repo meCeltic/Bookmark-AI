@@ -21,6 +21,9 @@ const daysAgo = (d: number, hour = 9) => {
 
 type Seed = Omit<NewBookmark, "collectionId"> & { collection?: string }
 
+/** The demo's removed post: seeded as already found dead, as its summary says. */
+export const DEMO_DEAD_URL = "https://example.com/blog/2019/this-post-was-removed"
+
 export const DEMO_BOOKMARKS: Seed[] = [
   {
     url: "https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations",
@@ -294,7 +297,7 @@ export const DEMO_BOOKMARKS: Seed[] = [
     readAt: daysAgo(17),
   },
   {
-    url: "https://example.com/blog/2019/this-post-was-removed",
+    url: DEMO_DEAD_URL,
     title: "A post that no longer exists",
     summary: "Saved from a newsletter in 2019. The link now returns a 404; the health check flags it so it can be cleaned up.",
     tags: ["archive"],

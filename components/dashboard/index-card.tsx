@@ -4,7 +4,7 @@ import { ArchiveRestore, BookOpen, Check, CheckCheck, Copy, ExternalLink, Folder
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 import type { Bookmark } from "@/lib/domain/bookmark"
-import { domainOf } from "@/lib/url/normalize"
+import { bareName, domainOf, registrableDomain } from "@/lib/url/normalize"
 import { cn, formatDate } from "@/lib/utils"
 import { Favicon } from "@/components/favicon"
 import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuSub, MenuTrigger } from "@/components/ui/menu"
@@ -319,6 +319,16 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
     </a>
   )
 
+  // "domain · age" as one unit where only the domain gives way. A dead link: the domain struck, "Dead" for the age.
+  const dead = bookmark.health === "dead"
+  const tail = dead ? "Dead" : age
+  const meta = (host: string) => (
+    <>
+      <span className={cn("min-w-0 truncate", dead && "line-through decoration-ink-3")}>{host}</span>
+      <span className={cn("shrink-0 whitespace-pre", dead && !wasDead && "anim-stamp")} style={dead ? ({ "--i": index % 12 } as CSSProperties) : undefined}>{` · ${tail}`}</span>
+    </>
+  )
+
   // ---------------------------------------------------------------- list ----
   if (layout === "list") {
     return (
@@ -335,24 +345,23 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
         <div className="min-w-0">
           <div className="flex h-[22px] min-w-0 items-center gap-1.5">
             {titleLink(cn("min-w-0 truncate text-[15px] leading-[22px] text-ink outline-none hover:underline", unread ? "font-semibold" : "font-normal", pending && !bookmark.summary && "text-ink-2"))}
-            {bookmark.favourite ? (
-              <Star key={starPops} size={12} aria-label="Starred" fill="var(--mark)" stroke="none" className={cn("shrink-0", starPops > 0 && "anim-star")} />
-            ) : null}
-            {health}
+            {bookmark.favourite ? <FavStar pops={starPops} /> : null}
+            {/* A dead link shows in the meta column instead (struck domain, "Dead"). */}
+            {bookmark.health === "dead" ? null : health}
             {tagInput}
           </div>
           {/* Line 2: the summary, stopping short of the meta column. Phones: up to two lines, meta on line 3. */}
           {summary ? (
-            <p className={cn("mt-0.5 truncate font-summary text-[14px] italic leading-5 text-ink-2 max-sm:line-clamp-2 max-sm:whitespace-normal", !hadSummary && "anim-wipe")}>{summary}</p>
+            <p className={cn("mt-0.5 truncate font-summary text-[14px] italic leading-5 text-ink-2 max-sm:line-clamp-2 max-sm:whitespace-normal lg:max-w-[72ch]", !hadSummary && "anim-wipe")}>{summary}</p>
           ) : failed ? (
             <p className="mt-0.5 truncate text-[13px] leading-5 text-ink-3">Couldn&rsquo;t read this page</p>
           ) : null}
-          <p className="mt-0.5 flex min-w-0 text-[13px] leading-5 text-ink-3 sm:hidden"><span className="min-w-0 truncate">{domain}</span><span className="shrink-0 whitespace-pre"> · {age}</span></p>
+          <p className="mt-0.5 flex min-w-0 text-[13px] leading-5 text-ink-3 sm:hidden">{meta(domain)}</p>
         </div>
         {/* Wide: a fixed column for domain · age; hover swaps it for the actions, so nothing covers the summary. */}
         <div className="row-slot max-sm:hidden">
           {/* The domain gives way before the age does. */}
-          <span className="row-meta flex min-w-0 text-[13px] text-ink-3" title={domain}><span className="min-w-0 truncate">{slotHost(domain)}</span><span className="shrink-0 whitespace-pre"> · {age}</span></span>
+          <span className="row-meta flex min-w-0 text-[13px] text-ink-3" title={dead ? `${domain}: the link is dead` : domain}>{meta(metaHost(domain, tail))}</span>
           {actions}
         </div>
         {touchMore}
@@ -371,11 +380,10 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
         flash && "flash-ring",
       )}
     >
-      {bookmark.favourite ? <span aria-hidden className="fold" /> : null}
-
       <header className="flex h-5 min-w-0 items-center gap-2 text-[13px] text-ink-3">
         {selectSlot}
         <span className="min-w-0 truncate">{domain}</span>
+        {bookmark.favourite ? <FavStar pops={starPops} /> : null}
         {health}
         <span className="row-slot ml-auto shrink-0 pr-1">
           <span className="row-meta">{age}</span>
@@ -399,14 +407,56 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
   )
 }
 
+/** The one favourite sign, list and grid alike: a 12px star, ink outline, yellow fill. */
+function FavStar({ pops }: { pops: number }) {
+  return (
+    <Star
+      key={pops}
+      size={12}
+      strokeWidth={1.5}
+      absoluteStrokeWidth
+      role="img"
+      aria-label="Starred"
+      fill="var(--mark)"
+      stroke="var(--ink)"
+      className={cn("shrink-0", pops > 0 && "anim-star")}
+    />
+  )
+}
+
 /**
  * The right slot's host: whole when it fits (joelonsoftware.com), otherwise the subdomain part
  * gives way first (cheatsheetseries.owasp.org → owasp.org); the registrable name never truncates.
  */
 export function slotHost(host: string, max = 22): string {
-  if (host.length <= max) return host
-  const labels = host.split(".")
-  // Keep a two-letter second level with its country (bbc.co.uk), else the last two labels.
-  const keep = labels.length > 2 && labels.at(-2)!.length <= 3 && labels.at(-1)!.length === 2 ? 3 : 2
-  return labels.length > keep ? labels.slice(-keep).join(".") : host
+  return host.length <= max ? host : registrableDomain(host)
+}
+
+/** Rough advance widths in em for the UI sans at 13px: enough to tell whether a label fits. */
+function emWidth(text: string): number {
+  let w = 0
+  for (const ch of text) {
+    if ("ijl.,:;'| ".includes(ch)) w += 0.3
+    else if ("ftr-".includes(ch)) w += 0.4
+    else if ("mwMW".includes(ch)) w += 0.85
+    else if (/[0-9]/.test(ch)) w += 0.6
+    else w += 0.56
+  }
+  return w
+}
+
+/** The slot holds about this many em of "domain · age" (12.5rem at 13px, less a margin). */
+const SLOT_EM = 14.5
+
+/**
+ * The host for the meta slot, so "domain · age" fits whole: the subdomain goes first, then the
+ * suffix (smashingmagazine.com → smashingmagazine). Never an ellipsis next to the age.
+ */
+export function metaHost(host: string, tail: string, budget = SLOT_EM): string {
+  const fits = (h: string) => emWidth(`${h} · ${tail}`) <= budget
+  const slot = slotHost(host)
+  if (fits(slot)) return slot
+  const reg = registrableDomain(host)
+  if (fits(reg)) return reg
+  return bareName(host)
 }

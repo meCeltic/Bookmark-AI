@@ -32,6 +32,7 @@ import { normalizeUrl, canonicalKey, domainOf } from "@/lib/url/normalize"
 import type { ImportedBookmark } from "@/lib/import/netscape"
 import { dedupeImports } from "@/lib/import/netscape"
 import { undoToast } from "./undo-toast"
+import { formatDate } from "@/lib/utils"
 
 /**
  * One state tree for the whole dashboard. Mutations are optimistic: the
@@ -487,7 +488,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       if (existing) {
         // Not an error: take them to the card they already have.
         reveal(existing.id, { flash: true })
-        toast(`Already saved on ${new Date(existing.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`)
+        toast(`Already saved on ${formatDate(existing.createdAt, { year: "always" })}`)
         return existing
       }
 
@@ -553,14 +554,13 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       if (!targets.length) return
       const stamp = new Date().toISOString()
       const run = opts?.move ? withTransition : async (fn: () => void) => fn()
+      // Cleared now, not inside the transition callback: an Esc in the same frame must see the pane as closing.
+      if (opts?.closePreview) latestPreview.current = null
       const applied = run(() => {
         dispatch({ type: "upsertMany", bookmarks: targets.map((b) => ({ ...b, ...p, updatedAt: stamp })) })
         dispatch({ type: "select", ids: [], mode: "set" })
         // One transition for both: a second startViewTransition would cut the first short.
-        if (opts?.closePreview) {
-          latestPreview.current = null
-          dispatch({ type: "preview", id: null })
-        }
+        if (opts?.closePreview) dispatch({ type: "preview", id: null })
       })
       const result = await repo.updateBookmarks(targets.map((b) => b.id), p)
       await applied

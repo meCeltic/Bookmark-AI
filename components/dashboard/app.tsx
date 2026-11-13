@@ -6,7 +6,7 @@ import type { Bookmark, Collection } from "@/lib/domain/bookmark"
 import { LocalRepository, MemoryStore } from "@/lib/repo/local"
 import { RemoteRepository } from "@/lib/repo/remote"
 import type { BookmarkRepository } from "@/lib/repo/types"
-import { DEMO_COLLECTIONS, buildSeed } from "@/lib/demo/seed"
+import { DEMO_COLLECTIONS, DEMO_DEAD_URL, buildSeed } from "@/lib/demo/seed"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import { DashboardProvider } from "./provider"
 import { DashboardShell } from "./shell"
@@ -27,7 +27,10 @@ async function seedDemo(repo: BookmarkRepository) {
     const r = await repo.createCollection(name)
     if (r.ok) collections.push(r.data)
   }
-  await repo.importBookmarks(buildSeed(collections))
+  const imported = await repo.importBookmarks(buildSeed(collections))
+  // The dead-link state is part of the tour: the removed post arrives already checked.
+  const dead = imported.ok ? imported.data.created.find((b) => b.url === DEMO_DEAD_URL) : undefined
+  if (dead) await repo.updateBookmark(dead.id, { health: "dead", healthCheckedAt: new Date().toISOString() })
 }
 
 export function DashboardApp(props: CloudProps | DemoProps) {
