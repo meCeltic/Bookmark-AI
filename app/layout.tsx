@@ -47,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${schibsted.variable} ${newsreader.variable}`}
     >
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           {children}
           <Toaster
             position="bottom-center"
