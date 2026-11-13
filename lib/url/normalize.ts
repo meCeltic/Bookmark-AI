@@ -125,3 +125,22 @@ export function domainOf(url: string): string {
   const parsed = parseHttpUrl(url)
   return parsed === null ? "" : stripWww(parsed.hostname)
 }
+
+/**
+ * The registrable part of a host, by a cheap rule rather than the public-suffix list:
+ * the last two labels, or three when the second-level one is short beside a country code
+ * (cheatsheetseries.owasp.org → owasp.org, news.bbc.co.uk → bbc.co.uk).
+ */
+export function registrableDomain(host: string): string {
+  const labels = host.replace(/^www\./, "").split(".").filter(Boolean)
+  if (labels.length <= 2 || /^\d+$/.test(labels.at(-1)!)) return labels.join(".")
+  const keep = labels.at(-2)!.length <= 3 && labels.at(-1)!.length === 2 ? 3 : 2
+  return labels.slice(-keep).join(".")
+}
+
+/** The registrable domain without its public suffix: smashingmagazine.com → smashingmagazine. */
+export function bareName(host: string): string {
+  const reg = registrableDomain(host)
+  const labels = reg.split(".")
+  return labels.length > 1 ? labels[0]! : reg
+}

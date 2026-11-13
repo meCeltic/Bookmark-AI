@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { domainOf } from "@/lib/url/normalize"
+import { domainOf, registrableDomain } from "@/lib/url/normalize"
 import { cn } from "@/lib/utils"
 import { isBlankIcon, PROBE_MAX_PX } from "@/lib/client/blank-icon"
 
@@ -16,7 +16,9 @@ type Status = "loading" | "ok" | "failed"
 
 /** The lettered tile: the domain's first letter on the inset surface. No globe icons. */
 export function FaviconTile({ url, size = 16, className }: { url: string; size?: number; className?: string }) {
-  const letter = (domainOf(url) || url.replace(/^[a-z]+:\/\//i, "") || "?").replace(/^www\./, "").charAt(0).toUpperCase() || "?"
+  // The letter of the name shown beside it (owasp.org, not cheatsheetseries.owasp.org).
+  const host = domainOf(url) || url.replace(/^[a-z]+:\/\//i, "").split(/[/?#]/)[0] || ""
+  const letter = registrableDomain(host).charAt(0).toUpperCase() || "?"
   return (
     <span
       aria-hidden
@@ -59,7 +61,8 @@ export function Favicon({ url, src, size = 16, className }: Props) {
   if (!src || status === "failed") return <FaviconTile url={url} size={size} className={className} />
   return (
     <span className={cn("relative inline-flex shrink-0", className)} style={{ width: size, height: size }}>
-      {status === "ok" ? null : <FaviconTile url={url} size={size} className="absolute inset-0" />}
+      {/* Tile and icon cross-fade (opacity only), so a late icon never pops in. */}
+      <FaviconTile url={url} size={size} className={cn("absolute inset-0 transition-opacity duration-[120ms] ease-out motion-reduce:transition-none", status === "ok" && "opacity-0")} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={ref}
@@ -71,7 +74,7 @@ export function Favicon({ url, src, size = 16, className }: Props) {
         referrerPolicy="no-referrer"
         onError={() => setState((s) => (s.src === src ? { ...s, status: "failed" } : s))}
         onLoad={(e) => settle(e.currentTarget)}
-        className={cn("relative rounded-[3px] object-contain", status === "ok" ? "opacity-100" : "opacity-0")}
+        className={cn("relative rounded-[3px] object-contain transition-opacity duration-[120ms] ease-out motion-reduce:transition-none", status === "ok" ? "opacity-100" : "opacity-0")}
         style={{ width: size, height: size }}
       />
     </span>
