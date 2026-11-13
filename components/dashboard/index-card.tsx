@@ -1,6 +1,6 @@
 "use client"
 
-import { ArchiveRestore, BookOpen, Check, CheckCheck, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
+import { ArchiveRestore, BookOpen, Check, CheckCheck, Copy, ExternalLink, FolderInput, MoreHorizontal, PanelRight, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 import type { Bookmark } from "@/lib/domain/bookmark"
@@ -89,18 +89,17 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
     api.dispatch({ type: "select", ids: [bookmark.id], mode: "toggle" })
   }
 
-  // A click previews; ⌘/Ctrl-click opens the link; while selecting, a click toggles.
+  // A click opens the link in a new tab; ⌘/Ctrl-click previews; while selecting, a click toggles.
   const onCardClick = (e: MouseEvent) => {
     if (selecting) {
       toggleSelect(e)
       return
     }
-    if (e.metaKey || e.ctrlKey) {
-      api.open(bookmark)
+    if ((e.metaKey || e.ctrlKey) && onPreview) {
+      onPreview()
       return
     }
-    if (onPreview) onPreview()
-    else api.open(bookmark)
+    api.open(bookmark)
   }
 
   // The title is a real link (new tab); it only needs to record the open.
@@ -147,6 +146,7 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
       </MenuTrigger>
       <MenuContent onClick={(e) => e.stopPropagation()}>
         <MenuItem onSelect={() => api.open(bookmark)}><ExternalLink size={14} /> Open<span className="kbd ml-auto">o</span></MenuItem>
+        {onPreview ? <MenuItem onSelect={onPreview}><PanelRight size={14} /> Details<span className="kbd ml-auto">space</span></MenuItem> : null}
         <MenuItem onSelect={copy}><Copy size={14} /> Copy link<span className="kbd ml-auto">c</span></MenuItem>
         <MenuItem onSelect={() => toggleSelect()}><Check size={14} /> {selected ? "Deselect" : "Select"}<span className="kbd ml-auto">x</span></MenuItem>
         <MenuSeparator />

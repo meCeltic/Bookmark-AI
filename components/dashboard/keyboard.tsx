@@ -59,6 +59,7 @@ export function useKeyboard({ items, focusId, setFocusId, list }: Options) {
         case "j": case "ArrowDown": e.preventDefault(); move(1); break
         case "k": case "ArrowUp": e.preventDefault(); move(-1); break
         case "Enter": case "o": if (current) { e.preventDefault(); api.open(current) } break
+        case " ": if (current) { e.preventDefault(); api.setPreview(previewing ? null : current.id) } break
         case "f": if (current) void api.patch(current.id, { favourite: !current.favourite }); break
         case "r": if (current) void api.patch(current.id, { readAt: current.readAt ? null : new Date().toISOString() }); break
         case "R": e.preventDefault(); api.readSomething(); break

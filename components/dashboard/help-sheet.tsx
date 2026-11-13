@@ -8,6 +8,7 @@ const ROWS: Array<[string, string]> = [
   ["j / k", "Next / previous card"],
   ["click", "Preview card"],
   ["↵ / o", "Open link"],
+  ["space", "Preview details"],
   ["esc", "Close preview"],
   ["d", "Done: mark read, clear from Inbox"],
   ["f", "Star"],

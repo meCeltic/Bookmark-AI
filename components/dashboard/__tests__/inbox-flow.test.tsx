@@ -96,7 +96,7 @@ describe("Collection picker and tags", () => {
   it("the pane files a card through a plain-text menu, not a <select>", async () => {
     const { container } = await mountWithRepo(<><BookmarkGrid /><PreviewPane /></>, seed.slice(0, 1))
     expect(container.querySelector("select")).toBeNull()
-    fireEvent.click(screen.getByRole("link", { name: /Postgres search guide/ }).closest("li")!)
+    fireEvent.click(screen.getByRole("link", { name: /Postgres search guide/ }).closest("li")!, { metaKey: true })
     const pane = screen.getByRole("complementary", { name: "Preview" })
     expect(pane.querySelector("select")).toBeNull()
     expect(within(pane).getByRole("button", { name: "Add to collection" })).toHaveTextContent("Add to collection…")

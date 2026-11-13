@@ -26,10 +26,10 @@ beforeEach(() => {
 afterEach(() => { openSpy.mockRestore(); window.localStorage.clear(); vi.mocked(toast).mockClear() })
 
 describe("PreviewPane", () => {
-  it("opens on a row click with the full summary, reading time, tags and actions", async () => {
+  it("opens on a ⌘-click with the full summary, reading time, tags and actions", async () => {
     await mount()
     expect(pane()).toBeNull()
-    fireEvent.click(rowOf("First card"))
+    fireEvent.click(rowOf("First card"), { metaKey: true })
     const p = within(pane()!)
     expect(p.getByRole("link", { name: "First card" })).toHaveAttribute("target", "_blank")
     expect(p.getByText("The first summary, in full.")).toHaveClass("font-summary")
@@ -43,7 +43,7 @@ describe("PreviewPane", () => {
 
   it("j moves the pane along, o opens the link, Esc closes it", async () => {
     await mount()
-    fireEvent.click(rowOf("First card"))
+    fireEvent.click(rowOf("First card"), { metaKey: true })
     fireEvent.keyDown(document.body, { key: "j" })
     expect(within(pane()!).getByRole("link", { name: "Second card" })).toBeInTheDocument()
     fireEvent.keyDown(document.body, { key: "o" })
@@ -54,7 +54,7 @@ describe("PreviewPane", () => {
 
   it("d marks the previewed card done and moves on to the next one", async () => {
     const { repo } = await mount()
-    fireEvent.click(rowOf("First card"))
+    fireEvent.click(rowOf("First card"), { metaKey: true })
     fireEvent.keyDown(document.body, { key: "d" })
     await waitFor(async () => {
       const first = (await repo.listBookmarks()).find((b) => b.title === "First card")!
@@ -64,13 +64,13 @@ describe("PreviewPane", () => {
     expect(within(pane()!).getByRole("link", { name: "Second card" })).toBeInTheDocument()
   })
 
-  it("⌘-click on a row opens the link instead of previewing, and the first open shows the d hint once", async () => {
+  it("a plain click on a row opens the link instead of previewing, and the first open shows the d hint once", async () => {
     await mount()
-    fireEvent.click(rowOf("First card"), { metaKey: true })
+    fireEvent.click(rowOf("First card"))
     expect(openSpy).toHaveBeenCalledTimes(1)
     expect(pane()).toBeNull()
     expect(toast).toHaveBeenCalledWith("Read it? Press d to clear it from your Inbox", expect.anything())
-    fireEvent.click(rowOf("Second card"), { metaKey: true })
+    fireEvent.click(rowOf("Second card"))
     expect(vi.mocked(toast).mock.calls.filter(([m]) => typeof m === "string" && m.startsWith("Read it?"))).toHaveLength(1)
   })
 
@@ -85,7 +85,7 @@ describe("PreviewPane", () => {
 
   it("the star pops when added, and a different card starts with no pop", async () => {
     await mount()
-    fireEvent.click(rowOf("First card"))
+    fireEvent.click(rowOf("First card"), { metaKey: true })
     fireEvent.click(within(pane()!).getByRole("button", { name: /Star/ }))
     await waitFor(() => expect(pane()!.querySelector(".anim-star")).not.toBeNull())
     fireEvent.keyDown(document.body, { key: "j" })
@@ -100,7 +100,7 @@ describe("PreviewPane", () => {
 
   it("Done on the last card closes the pane along with the done", async () => {
     const { repo } = await mountWithRepo(<><BookmarkGrid /><PreviewPane /></>, seed.slice(0, 1))
-    fireEvent.click(rowOf("First card"))
+    fireEvent.click(rowOf("First card"), { metaKey: true })
     fireEvent.click(within(pane()!).getByRole("button", { name: /^Done/ }))
     await waitFor(() => expect(pane()).toBeNull())
     await waitFor(async () => expect((await repo.listBookmarks())[0]!.archivedAt).not.toBeNull())
