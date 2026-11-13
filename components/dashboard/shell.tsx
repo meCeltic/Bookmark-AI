@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X } from "lucide-react"
+import { MoreHorizontal, Pencil, Trash2, X } from "lucide-react"
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@/components/ui/menu"
 import { useDashboard } from "./provider"
 import { Sidebar } from "./sidebar"
 import { TopBar } from "./topbar"
@@ -13,12 +14,15 @@ import { ExportDialog } from "./export-dialog"
 import { BulkBar } from "./bulk-bar"
 import { HelpSheet } from "./help-sheet"
 import { DemoBanner } from "./demo-banner"
+import { SaveToast } from "./save-toast"
 
 interface Props {
   userLabel: string
   cloudAvailable: boolean
   onSignOut?: () => void
 }
+
+const VIEW_HEADING = { all: "Inbox", favourites: "Starred", archive: "Archive" } as const
 
 export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) {
   const api = useDashboard()
@@ -36,21 +40,23 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
   }, [])
 
   const view = state.view
-  const heading =
-    view.kind === "collection"
+  const heading = state.healthFilter
+    ? "Dead links"
+    : view.kind === "collection"
       ? (state.collections.find((c) => c.id === view.id)?.name ?? "Collection")
-      : { all: "All cards", unsorted: "Unsorted", favourites: "Favourites", reading: "Reading list", archive: "Archive" }[view.view]
+      : VIEW_HEADING[view.view]
 
   const shown = api.hits ? api.hits.length : api.visible.length
+  const unreadHere = api.hits ? 0 : api.visible.filter((b) => b.readAt === null && !b.archivedAt).length
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-dvh min-w-0 overflow-hidden">
       <Sidebar className="hidden lg:flex" userLabel={userLabel} onImport={() => setImporting(true)} onExport={() => setExporting(true)} onSignOut={onSignOut} />
 
       <DialogPrimitive.Root open={drawer} onOpenChange={setDrawer}>
         <DialogPrimitive.Portal>
-          <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-ink/30 lg:hidden" />
-          <DialogPrimitive.Content className="fixed inset-y-0 left-0 z-50 flex outline-none lg:hidden">
+          <DialogPrimitive.Overlay className="fade-anim fixed inset-0 z-40 bg-ink/30 lg:hidden dark:bg-black/60" />
+          <DialogPrimitive.Content className="fade-anim fixed inset-y-0 left-0 z-50 flex max-w-[calc(100vw-48px)] outline-none lg:hidden">
             <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
             <Sidebar userLabel={userLabel} onImport={() => { setDrawer(false); setImporting(true) }} onExport={() => { setDrawer(false); setExporting(true) }} onSignOut={onSignOut} onNavigate={() => setDrawer(false)} />
             <DialogPrimitive.Close className="btn btn-icon m-2 h-9 w-9 self-start" aria-label="Close menu"><X size={16} /></DialogPrimitive.Close>
@@ -62,21 +68,23 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
         <TopBar onOpenPalette={() => setPalette(true)} onOpenMenu={() => setDrawer(true)} />
         {api.mode === "demo" ? <DemoBanner cloudAvailable={cloudAvailable} /> : null}
 
-        <main className="quiet-scroll flex-1 overflow-y-auto px-3 pb-24 pt-4 sm:px-5">
-          <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h1 className="font-display text-[22px] font-medium">{heading}</h1>
-            <span className="font-mono text-[11.5px] text-ink-3">
-              {api.hits ? `${shown} match${shown === 1 ? "" : "es"}` : `${shown} ${shown === 1 ? "card" : "cards"}`}
+        <main className="quiet-scroll min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-24">
+          <div className="mb-4 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h1 className="min-w-0 truncate text-[22px] font-bold tracking-[-0.02em]">{heading}</h1>
+            <span className="text-[13px] text-ink-3">
+              {api.hits
+                ? `${shown} ${shown === 1 ? "match" : "matches"}`
+                : `${shown} ${shown === 1 ? "card" : "cards"}${unreadHere && view.kind === "view" && view.view === "all" ? `, ${unreadHere} unread` : ""}`}
             </span>
             {state.tags.length ? (
-              <span className="flex items-center gap-1.5">
-                {state.tags.map((t) => (
-                  <button key={t} type="button" className="stamp" data-active="true" onClick={() => api.dispatch({ type: "tags", tags: state.tags.filter((x) => x !== t) })}>{t} ×</button>
-                ))}
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+                {state.tags.map((t) => <ActiveTag key={t} tag={t} />)}
               </span>
             ) : null}
             {state.healthFilter ? (
-              <button type="button" className="stamp stamp-quiet" onClick={() => api.dispatch({ type: "healthFilter", value: null })}>dead links ×</button>
+              <button type="button" className="btn btn-ghost btn-sm h-6 px-1.5 text-[13px]" onClick={() => api.dispatch({ type: "healthFilter", value: null })}>
+                Show all <X size={12} />
+              </button>
             ) : null}
           </div>
           <BookmarkGrid />
@@ -84,10 +92,63 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
       </div>
 
       <BulkBar onExport={() => setExporting(true)} />
+      <SaveToast />
       <CommandPalette open={palette} onOpenChange={setPalette} onImport={() => setImporting(true)} onExport={() => setExporting(true)} onHelp={() => setHelp(true)} />
       <ImportDialog open={importing} onOpenChange={setImporting} />
       <ExportDialog open={exporting} onOpenChange={setExporting} />
       <HelpSheet open={help} onOpenChange={setHelp} />
     </div>
+  )
+}
+
+/** An active tag filter: click to drop it; its menu renames, merges or removes the tag everywhere. */
+function ActiveTag({ tag }: { tag: string }) {
+  const api = useDashboard()
+  const { state } = api
+  const [renaming, setRenaming] = useState<string | null>(null)
+
+  if (renaming !== null) {
+    return (
+      <input
+        autoFocus
+        className="field h-7 w-44 text-[13px]"
+        value={renaming}
+        maxLength={32}
+        aria-label={`Rename #${tag}`}
+        placeholder="New name, empty removes"
+        onChange={(e) => setRenaming(e.target.value)}
+        onBlur={() => { if (renaming.trim() !== tag) void api.renameTag(tag, renaming); setRenaming(null) }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur()
+          if (e.key === "Escape") { setRenaming(tag); e.currentTarget.blur() }
+        }}
+      />
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center">
+      <button
+        type="button"
+        className="tag"
+        data-active="true"
+        title={`Stop filtering by #${tag}`}
+        onClick={() => api.dispatch({ type: "tags", tags: state.tags.filter((x) => x !== tag) })}
+      >
+        {tag}
+      </button>
+      <MenuRoot>
+        <MenuTrigger asChild>
+          <button type="button" className="btn btn-ghost btn-icon h-6 w-6 text-ink-3" aria-label={`Options for tag ${tag}`}>
+            <MoreHorizontal size={13} />
+          </button>
+        </MenuTrigger>
+        <MenuContent align="start" onCloseAutoFocus={(e) => e.preventDefault()}>
+          <MenuItem onSelect={() => api.dispatch({ type: "tags", tags: state.tags.filter((x) => x !== tag) })}><X size={13} /> Stop filtering</MenuItem>
+          <MenuItem onSelect={() => setRenaming(tag)}><Pencil size={13} /> Rename or merge</MenuItem>
+          <MenuItem danger onSelect={() => api.renameTag(tag, "")}><Trash2 size={13} /> Remove from all cards</MenuItem>
+        </MenuContent>
+      </MenuRoot>
+    </span>
   )
 }
