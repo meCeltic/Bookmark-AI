@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useSyncExternalStore } from "react"
 import { ArchiveRestore, CheckCheck, ExternalLink, Star, X } from "lucide-react"
 import { domainOf } from "@/lib/url/normalize"
 import { cn, formatDate } from "@/lib/utils"
@@ -7,6 +8,15 @@ import { usePresence } from "@/lib/client/use-presence"
 import { Favicon } from "@/components/favicon"
 import { useDashboard } from "./provider"
 import { CollectionSelect, TagEditor } from "./tag-editor"
+
+const WIDE = "(min-width: 1024px)"
+const subscribeWide = (cb: () => void) => {
+  if (typeof window.matchMedia !== "function") return () => {}
+  const mq = window.matchMedia(WIDE)
+  mq.addEventListener("change", cb)
+  return () => mq.removeEventListener("change", cb)
+}
+const readWide = () => typeof window.matchMedia === "function" && window.matchMedia(WIDE).matches
 
 /**
  * The card in full beside the list: whole summary, editable tags, collection,
@@ -17,11 +27,22 @@ export function PreviewPane() {
   const api = useDashboard()
   const { state } = api
   const live = state.preview ? state.bookmarks.find((b) => b.id === state.preview) : undefined
-  // Stays mounted for the 140ms exit, showing the card as last seen.
-  const { item: bookmark, state: presence } = usePresence(live)
+  // Below lg the sheet stays mounted for its 140ms exit. At lg the column renders from live
+  // state: opening and closing run inside a view transition (provider.setPreview), which slides it.
+  const wide = useSyncExternalStore(subscribeWide, readWide, () => false)
+  const sheet = usePresence(live)
+  const bookmark = wide ? (live ?? null) : sheet.item
+  const presence = wide ? "open" : sheet.state
+  // The star pops when it is added, never on open or when moving between cards.
+  const [starSeen, setStarSeen] = useState({ id: "", fav: false, pops: 0 })
+  if (bookmark && (starSeen.id !== bookmark.id || starSeen.fav !== bookmark.favourite)) {
+    const added = starSeen.id === bookmark.id && bookmark.favourite
+    setStarSeen({ id: bookmark.id, fav: bookmark.favourite, pops: added ? starSeen.pops + 1 : starSeen.pops })
+  }
   if (!bookmark) return null
+  const starPop = starSeen.id === bookmark.id && starSeen.pops > 0 && bookmark.favourite
 
-  const close = () => api.dispatch({ type: "preview", id: null })
+  const close = () => api.setPreview(null)
   const pending = state.pending.has(bookmark.id)
   const archived = Boolean(bookmark.archivedAt)
   const meta = [
@@ -48,7 +69,7 @@ export function PreviewPane() {
         data-state={presence}
         className={cn(
           "pane-anim quiet-scroll fixed inset-x-0 bottom-0 z-50 max-h-[82dvh] min-w-0 overflow-y-auto rounded-t-[12px] border-t border-line bg-surface px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 shadow-pop",
-          "lg:static lg:z-auto lg:max-h-none lg:w-[380px] lg:shrink-0 lg:rounded-none lg:border-l lg:border-t-0 lg:bg-bg lg:pb-8 lg:pt-5 lg:shadow-none",
+          "lg:static lg:z-auto lg:max-h-none lg:w-[380px] lg:shrink-0 lg:[view-transition-name:preview] lg:rounded-none lg:border-l lg:border-t-0 lg:bg-bg lg:pb-8 lg:pt-5 lg:shadow-none",
           presence === "closed" && "pointer-events-none",
         )}
       >
@@ -89,24 +110,24 @@ export function PreviewPane() {
             <button type="button" className="btn btn-primary btn-sm" onClick={() => api.open(bookmark)}>
               <ExternalLink size={14} /> Open
             </button>
-            <button type="button" className="btn btn-sm" onClick={finish} title={archived ? "Back to Inbox (e)" : "Mark read, clear from Inbox (d)"}>
-              {archived ? <><ArchiveRestore size={14} /> Back to Inbox</> : <><CheckCheck size={14} /> Done</>}
+            <button type="button" className="btn btn-ghost h-[30px] px-2.5 text-[14px] font-medium" onClick={finish} title={archived ? "Move to Inbox (u)" : "Mark read, clear from Inbox (d)"}>
+              {archived ? <><ArchiveRestore size={14} /> Move to Inbox</> : <><CheckCheck size={14} /> Done</>}
             </button>
             <button
               type="button"
-              className="btn btn-sm"
+              className="btn btn-ghost h-[30px] px-2.5 text-[14px] font-medium"
               aria-pressed={bookmark.favourite}
               onClick={() => void api.patch(bookmark.id, { favourite: !bookmark.favourite })}
             >
-              <Star key={String(bookmark.favourite)} size={14} className={cn(bookmark.favourite && "anim-star fill-mark text-ink")} />
+              <Star key={starSeen.pops} size={14} className={cn(starPop && "anim-star", bookmark.favourite && "fill-mark text-ink")} />
               {bookmark.favourite ? "Starred" : "Star"}
             </button>
           </div>
 
           <div className="mt-6 border-t border-line pt-4">
             <p className="text-[13px] font-medium text-ink-2">Tags</p>
-            <TagEditor bookmark={bookmark} stamp={false} onEscape={close} className="mt-2" />
-            <CollectionSelect bookmark={bookmark} className="mt-4" />
+            <TagEditor bookmark={bookmark} onEscape={close} className="mt-2" />
+            <CollectionSelect bookmark={bookmark} className="mt-3 -ml-0.5" />
           </div>
 
           <p className="mt-6 hidden text-[12px] text-ink-3 lg:block">

@@ -6,10 +6,12 @@ export interface Prefs {
   layout: Layout
   sort: SortOrder
   demoBannerDismissed: boolean
+  /** Inbox: whether the already-read group is unfolded. */
+  readOpen: boolean
 }
 
 const KEY = "bookmark-ai:prefs"
-const DEFAULTS: Prefs = { layout: "list", sort: "newest", demoBannerDismissed: false }
+const DEFAULTS: Prefs = { layout: "list", sort: "newest", demoBannerDismissed: false, readOpen: false }
 
 /** The UI offers Newest and Oldest only; older saved prefs fall back to Newest. */
 function sanitize(p: Prefs): Prefs {
@@ -17,6 +19,7 @@ function sanitize(p: Prefs): Prefs {
     layout: p.layout === "grid" ? "grid" : "list",
     sort: p.sort === "oldest" ? "oldest" : "newest",
     demoBannerDismissed: p.demoBannerDismissed === true,
+    readOpen: p.readOpen === true,
   }
 }
 

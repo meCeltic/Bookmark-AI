@@ -182,6 +182,24 @@ mark {
     border-color: var(--action);
     box-shadow: 0 0 0 3px var(--action-soft);
   }
+  /* Collection picker trigger: plain text like a tag, no pill. */
+  .pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 24px;
+    padding: 0 2px;
+    border-radius: 2px;
+    color: var(--ink-3);
+    font-size: 13px;
+    background: transparent;
+    cursor: pointer;
+    text-underline-offset: 3px;
+    transition: color 90ms var(--ease-enter);
+  }
+  .pick:hover, .pick[data-state="open"] { color: var(--ink); text-decoration: underline; }
+  .pick[data-set="true"] { color: var(--ink-2); }
+
   .field-bare {
     background: transparent;
     border: 0;
@@ -270,7 +288,8 @@ mark {
     border-radius: var(--radius-card);
     transition: border-color 90ms var(--ease-enter), background-color 90ms var(--ease-enter);
   }
-  .card:hover,
+  /* Hover counts only while the mouse drives: a key press puts data-keys on the list. */
+  :not([data-keys]) > .card:hover,
   .card:focus-within { border-color: var(--line-strong); }
   .card[data-selected="true"] {
     border-color: var(--action);
@@ -316,11 +335,44 @@ mark {
     border-radius: var(--radius-btn);
     transition: background-color 90ms var(--ease-enter);
   }
-  .row:hover,
-  .row:focus-within { background: var(--surface-2); }
-  .row[data-selected="true"] { background: color-mix(in oklab, var(--action-soft) 60%, var(--surface)); }
+  /* One row is lit at a time: the focused one (hover moves focus while the mouse drives). */
   .row[data-previewed="true"] { background: var(--surface-2); }
-  .row[data-focused="true"] { box-shadow: inset 2px 0 0 var(--ink); }
+  .row[data-focused="true"] { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--ink); }
+  .row[data-selected="true"] { background: color-mix(in oklab, var(--action-soft) 60%, var(--surface)); }
+  .row-list { grid-template-columns: 16px minmax(0, 1fr) 28px; }
+
+  /* The right slot: "domain · age" at rest, the actions on hover, so nothing covers the summary. */
+  .row-slot {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .row-meta { transition: opacity 90ms var(--ease-enter); }
+  .row-actions {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: opacity 90ms var(--ease-enter);
+  }
+  .card .row-actions { right: -8px; padding-left: 8px; background: var(--surface); }
+  .row-touch-more { display: flex; align-items: center; justify-content: flex-end; }
+  :not([data-keys]) > .group:hover .row-actions,
+  .row-actions:focus-within,
+  .row-actions:has([data-state="open"]) { opacity: 1; pointer-events: auto; }
+  :not([data-keys]) > .group:hover .row-meta,
+  .row-slot:focus-within .row-meta,
+  .row-slot:has([data-state="open"]) .row-meta { opacity: 0; }
+  /* Pane open: the previewed row already shows its actions in the pane; keep only the ⋯. */
+  [data-previewed="true"] .row-actions > :not(.row-more) { display: none; }
 
   /* Duplicate save / reveal: a yellow ring fades in and out; the card itself never blinks. */
   .flash-ring::after {
@@ -338,14 +390,14 @@ mark {
     opacity: 0;
     transition: opacity 90ms var(--ease-enter);
   }
-  .group:hover .card-buttons,
+  :not([data-keys]) > .group:hover .card-buttons,
   .group:focus-within .card-buttons,
   .card-actions[data-focused="true"] .card-buttons { opacity: 1; }
   .hover-reveal {
     opacity: 0;
     transition: opacity 90ms var(--ease-enter);
   }
-  .group:hover .hover-reveal,
+  :not([data-keys]) > .group:hover .hover-reveal,
   .group:focus-within .hover-reveal,
   .hover-reveal[data-state="open"],
   .hover-reveal[aria-checked="true"] { opacity: 1; }
@@ -359,7 +411,7 @@ mark {
   }
   .select-slot .select-check { position: absolute; inset: 0; transition: opacity 120ms var(--ease-enter); }
   .select-slot .select-icon { transition: opacity 120ms var(--ease-enter); }
-  .group:hover .select-slot .select-icon,
+  :not([data-keys]) > .group:hover .select-slot .select-icon,
   .select-slot[data-selecting="true"] .select-icon { opacity: 0; }
 
   /* Removable tag: the × shows on hover. */
@@ -510,9 +562,16 @@ mark {
 /* Preview: slides in from the right on wide screens, up as a sheet below lg. */
 [data-state="open"].pane-anim { animation: sheet-in 200ms var(--ease-move) both; }
 [data-state="closed"].pane-anim { animation: sheet-in 140ms var(--ease-exit) reverse both; }
+/* Wide screens: the pane is a column rendered from live state; a view transition slides it (below). */
 @media (min-width: 1024px) {
-  [data-state="open"].pane-anim { animation-name: pane-in; }
-  [data-state="closed"].pane-anim { animation-name: pane-in; }
+  [data-state].pane-anim { animation: none; }
+}
+/* Tag suggestions: drop from the field on wide screens; on phones they open upward, so fade-scale only. */
+[data-state="open"].suggest-anim { animation: fade-scale 120ms var(--ease-move) both; }
+[data-state="closed"].suggest-anim { animation: fade-scale 100ms var(--ease-exit) reverse both; }
+@media (min-width: 640px) {
+  [data-state="open"].suggest-anim { animation: pop 160ms var(--ease-move) both; }
+  [data-state="closed"].suggest-anim { animation: pop-out 100ms var(--ease-exit) both; }
 }
 
 /* Highlighter swipe: scales in from the left once. */
@@ -530,7 +589,10 @@ mark {
 }
 /* A card that leaves shrinks away; a card that arrives just appears in its slot. */
 ::view-transition-old(*):only-child { animation: vt-exit 140ms var(--ease-exit) both; }
-::view-transition-new(*):only-child { animation: none; }
+::view-transition-new(*):only-child { animation: fade 160ms var(--ease-enter) 60ms both; }
+/* The preview column slides in from the right and back out; the list reflows beside it. */
+::view-transition-new(preview):only-child { animation: pane-in 200ms var(--ease-move) both; }
+::view-transition-old(preview):only-child { animation: pane-in 140ms var(--ease-exit) reverse both; }
 /* The page itself holds still, except for the theme switch, which crossfades. */
 ::view-transition-old(root),
 ::view-transition-new(root) { animation: none; }
@@ -540,11 +602,11 @@ mark {
 
 @media (prefers-reduced-motion: reduce) {
   .anim-enter, .anim-rise, .anim-stamp, .anim-pop, .anim-wipe, .anim-star, .anim-roll, .swipe-in,
-  [data-state="open"].pop-anim, [data-state="open"].menu-anim, [data-state="open"].rise-anim, [data-state="open"].pane-anim {
+  [data-state="open"].pop-anim, [data-state="open"].menu-anim, [data-state="open"].rise-anim, [data-state="open"].pane-anim, [data-state="open"].suggest-anim {
     animation: fade 120ms var(--ease-enter) both;
     animation-delay: 0ms;
   }
-  [data-state="closed"].pop-anim, [data-state="closed"].menu-anim, [data-state="closed"].rise-anim, [data-state="closed"].pane-anim {
+  [data-state="closed"].pop-anim, [data-state="closed"].menu-anim, [data-state="closed"].rise-anim, [data-state="closed"].pane-anim, [data-state="closed"].suggest-anim {
     animation: fade 100ms var(--ease-exit) reverse both;
   }
   .reading::before { animation: none; width: 100%; opacity: 0.5; }
@@ -554,10 +616,33 @@ mark {
 
 .quiet-scroll { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 
+/* ---------------------------------------------------------- list columns */
+/* Unlayered: the row's grid and the omnibox's bare look must beat the layered defaults. */
+@media (min-width: 640px) {
+  .row-list { grid-template-columns: 16px minmax(0, 1fr) 11rem; }
+  /* Desktop omnibox: no fill, the top bar's bottom rule is its underline. */
+  .omni.field {
+    height: 55px;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    font-size: 15px;
+  }
+  .omni.field:hover { background: transparent; }
+  .omni.field:focus { background: transparent; border-color: transparent; box-shadow: inset 0 -2px 0 var(--action); }
+}
+@media (min-width: 640px) and (hover: hover) {
+  .row-touch-more { display: none; }
+}
+@media (min-width: 640px) and (hover: none) {
+  .row-list { grid-template-columns: 16px minmax(0, 1fr) 11rem 28px; }
+}
+
 /* ------------------------------------------------------------------ touch */
 /* Unlayered on purpose: these must win over utility classes.                */
 @media (hover: none) {
   .card-buttons { opacity: 1; }
+  .row-actions { display: none; }
   .hover-reveal { opacity: 0; }
   [data-editing="true"] .hover-reveal,
   .hover-reveal[aria-checked="true"],
