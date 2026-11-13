@@ -110,6 +110,12 @@ body {
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* Filled fields show focus with their own ring, not the outline. */
+.field:focus-visible,
+.rule-input:focus-visible,
+.field-bare:focus-visible {
+  outline: none;
+}
 
 @layer base {
   h1, h2, h3 {
