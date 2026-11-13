@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, ArchiveRestore, BookOpen, Check, CheckCheck, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
+import { ArchiveRestore, BookOpen, Check, CheckCheck, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
 import { useEffect, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 import type { Bookmark } from "@/lib/domain/bookmark"
@@ -36,9 +36,13 @@ function highlight(text: string, query: string): ReactNode {
 interface Props {
   bookmark: Bookmark
   layout: "grid" | "list"
+  /** Position in the list; staggers the dead-link stamps after a check. */
+  index?: number
   focused: boolean
   pending: boolean
   selected: boolean
+  /** Shown in the preview pane right now. */
+  previewed?: boolean
   /** Saved moments ago: plays the entrance once. */
   fresh?: boolean
   /** Briefly marked after a duplicate save or a reveal. */
@@ -46,17 +50,26 @@ interface Props {
   /** View transition name, only for the first few dozen visible cards. */
   transitionName?: string
   onFocus: () => void
+  /** Open this card in the preview pane. */
+  onPreview?: () => void
   /** Inclusive index pairs in the title that matched the search, if any. */
   titleRanges?: [number, number][]
 }
 
-export function IndexCard({ bookmark, layout, focused, pending, selected, fresh, flash, transitionName, onFocus, titleRanges }: Props) {
+export function IndexCard({ bookmark, layout, index = 0, focused, pending, selected, previewed, fresh, flash, transitionName, onFocus, onPreview, titleRanges }: Props) {
   const api = useDashboard()
   const [tagDraft, setTagDraft] = useState<string | null>(null)
+  // The star pops when it is added (click, `f`, bulk), never when it is taken away.
   const [starPops, setStarPops] = useState(0)
-  // What the card looked like when it mounted: a summary or tags that arrive later get the reveal.
+  const [wasFavourite, setWasFavourite] = useState(bookmark.favourite)
+  if (wasFavourite !== bookmark.favourite) {
+    setWasFavourite(bookmark.favourite)
+    if (bookmark.favourite) setStarPops((n) => n + 1)
+  }
+  // What the card looked like when it mounted: a summary, tags or a dead link that arrive later get the reveal.
   const [hadSummary] = useState(Boolean(bookmark.summary))
   const [hadTags] = useState(bookmark.tags.length > 0)
+  const [wasDead] = useState(bookmark.health === "dead")
   const { state } = api
   const selecting = state.selected.size > 0
 
@@ -74,12 +87,29 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
     api.dispatch({ type: "select", ids: [bookmark.id], mode: "toggle" })
   }
 
-  const openCard = (e: MouseEvent) => {
-    if (selecting || e.metaKey || e.ctrlKey) {
+  // A click previews; ⌘/Ctrl-click opens the link; while selecting, a click toggles.
+  const onCardClick = (e: MouseEvent) => {
+    if (selecting) {
       toggleSelect(e)
       return
     }
-    api.open(bookmark)
+    if (e.metaKey || e.ctrlKey) {
+      api.open(bookmark)
+      return
+    }
+    if (onPreview) onPreview()
+    else api.open(bookmark)
+  }
+
+  // The title is a real link (new tab); it only needs to record the open.
+  const onTitleClick = (e: MouseEvent<HTMLAnchorElement>) => {
+    e.stopPropagation()
+    if (selecting) {
+      e.preventDefault()
+      toggleSelect()
+      return
+    }
+    api.markOpened(bookmark)
   }
 
   const submitTag = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -96,10 +126,7 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
     toast("Link copied")
   }
 
-  const toggleStar = () => {
-    setStarPops((n) => n + 1)
-    void api.patch(bookmark.id, { favourite: !bookmark.favourite })
-  }
+  const toggleStar = () => void api.patch(bookmark.id, { favourite: !bookmark.favourite })
 
   const domain = domainOf(bookmark.url)
   const unread = bookmark.readAt === null && !bookmark.archivedAt
@@ -107,6 +134,7 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
   const title = titleRanges ? markRanges(bookmark.title, titleRanges) : highlight(bookmark.title, state.query)
   const summary = bookmark.summary ? highlight(bookmark.summary, state.query) : null
   const age = formatDate(bookmark.createdAt)
+  const failed = !summary && bookmark.enrichment === "failed" && !pending
 
   const menu = (
     <MenuRoot>
@@ -116,10 +144,15 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
         </button>
       </MenuTrigger>
       <MenuContent onClick={(e) => e.stopPropagation()}>
-        <MenuItem onSelect={() => api.open(bookmark)}><ExternalLink size={14} /> Open<span className="kbd ml-auto">↵</span></MenuItem>
+        <MenuItem onSelect={() => api.open(bookmark)}><ExternalLink size={14} /> Open<span className="kbd ml-auto">o</span></MenuItem>
         <MenuItem onSelect={copy}><Copy size={14} /> Copy link<span className="kbd ml-auto">c</span></MenuItem>
         <MenuItem onSelect={() => toggleSelect()}><Check size={14} /> {selected ? "Deselect" : "Select"}<span className="kbd ml-auto">x</span></MenuItem>
         <MenuSeparator />
+        {archived ? (
+          <MenuItem onSelect={() => api.toggleArchive(bookmark)}><ArchiveRestore size={14} /> Back to Inbox<span className="kbd ml-auto">e</span></MenuItem>
+        ) : (
+          <MenuItem onSelect={() => api.done([bookmark.id])}><CheckCheck size={14} /> Done<span className="kbd ml-auto">d</span></MenuItem>
+        )}
         <MenuItem onSelect={() => api.patch(bookmark.id, { readAt: unread ? new Date().toISOString() : null })}>
           <BookOpen size={14} /> {unread ? "Mark as read" : "Mark unread"}<span className="kbd ml-auto">r</span>
         </MenuItem>
@@ -136,9 +169,6 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
         </MenuSub>
         <MenuSeparator />
         <MenuItem onSelect={() => api.reEnrich(bookmark.id)} disabled={pending}><RefreshCw size={14} /> Read page again</MenuItem>
-        <MenuItem onSelect={() => api.toggleArchive(bookmark)}>
-          {archived ? <ArchiveRestore size={14} /> : <Archive size={14} />} {archived ? "Restore" : "Archive"}<span className="kbd ml-auto">e</span>
-        </MenuItem>
         <MenuItem danger onSelect={() => api.remove([bookmark.id])}><Trash2 size={14} /> Delete<span className="kbd ml-auto">⌫</span></MenuItem>
       </MenuContent>
     </MenuRoot>
@@ -148,25 +178,25 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
     <button
       type="button"
       className="btn btn-ghost btn-icon h-7 w-7"
-      title={bookmark.favourite ? "Unstar" : "Star"}
+      title={bookmark.favourite ? "Unstar (f)" : "Star (f)"}
       aria-label={bookmark.favourite ? "Unstar" : "Star"}
       aria-pressed={bookmark.favourite}
       onClick={(e) => { e.stopPropagation(); toggleStar() }}
     >
-      <Star key={starPops} size={14} className={cn(starPops > 0 && "anim-star", bookmark.favourite && "fill-mark text-ink")} />
+      <Star key={starPops} size={14} className={cn(starPops > 0 && bookmark.favourite && "anim-star", bookmark.favourite && "fill-mark text-ink")} />
     </button>
   )
   const doneButton = archived ? (
-    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Restore to Inbox" aria-label="Restore" onClick={(e) => { e.stopPropagation(); void api.toggleArchive(bookmark) }}>
+    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Back to Inbox (e)" aria-label="Restore" onClick={(e) => { e.stopPropagation(); void api.toggleArchive(bookmark) }}>
       <ArchiveRestore size={14} />
     </button>
   ) : (
-    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Done: mark read and archive (d)" aria-label="Done" onClick={(e) => { e.stopPropagation(); void api.done([bookmark.id]) }}>
+    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Done: mark read, clear from Inbox (d)" aria-label="Done" onClick={(e) => { e.stopPropagation(); void api.done([bookmark.id]) }}>
       <CheckCheck size={14} />
     </button>
   )
   const copyButton = (
-    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Copy link" aria-label="Copy link" onClick={(e) => { e.stopPropagation(); void copy() }}>
+    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Copy link (c)" aria-label="Copy link" onClick={(e) => { e.stopPropagation(); void copy() }}>
       <Copy size={14} />
     </button>
   )
@@ -175,7 +205,7 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
     tagDraft !== null ? (
       <input
         autoFocus
-        className="h-6 w-28 min-w-0 rounded-[4px] bg-surface-2 px-1.5 text-[13px] outline-none focus:shadow-[0_0_0_2px_var(--action)]"
+        className="h-6 w-28 min-w-0 shrink-0 rounded-[4px] bg-surface-2 px-1.5 text-[13px] font-normal outline-none focus:shadow-[0_0_0_2px_var(--action)]"
         placeholder="tag, enter"
         aria-label="New tag"
         maxLength={32}
@@ -241,64 +271,79 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
     </span>
   )
 
+  // Dead links found by a check stamp in one after another; ones already dead on load just sit there.
   const health =
-    bookmark.health === "dead" ? <span className="anim-stamp shrink-0 text-[12px] font-medium text-danger">Dead link</span>
-    : bookmark.health === "redirected" ? <span className="shrink-0 text-[12px] text-ink-3">Moved</span>
+    bookmark.health === "dead" ? (
+      <span className={cn("inline-block shrink-0 text-[12px] font-medium text-danger", !wasDead && "anim-stamp")} style={{ "--i": index % 12 } as CSSProperties}>Dead link</span>
+    ) : bookmark.health === "redirected" ? <span className="shrink-0 text-[12px] text-ink-3">Moved</span>
     : null
 
   const common = {
     "data-id": bookmark.id,
     "data-selected": selected,
     "data-focused": focused,
+    "data-previewed": Boolean(previewed),
     "data-editing": tagDraft !== null,
-    onClick: openCard,
+    onClick: onCardClick,
     onMouseEnter: onFocus,
     style: transitionName ? ({ viewTransitionName: transitionName } as CSSProperties) : undefined,
   }
-  const flashClass = flash && "anim-fade shadow-[0_0_0_2px_var(--mark)]"
+  const titleLink = (className: string) => (
+    // A real link: new tab, the URL in the status bar, Tab reaches every row.
+    <a
+      href={bookmark.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={onTitleClick}
+      onAuxClick={(e) => { if (e.button === 1) api.markOpened(bookmark) }}
+      onFocus={onFocus}
+      className={className}
+    >
+      {title}
+    </a>
+  )
 
   // ---------------------------------------------------------------- list ----
   if (layout === "list") {
+    const meta = `${domain} · ${age}`
+    const lead = Boolean(summary || failed)
     return (
       <li
         {...common}
         className={cn(
-          "row group relative min-w-0 cursor-pointer gap-3 px-2 sm:px-3",
-          "grid-cols-[16px_minmax(0,1fr)_auto_28px] md:grid-cols-[16px_minmax(0,1fr)_minmax(0,9rem)_minmax(0,12rem)_3.5rem_28px]",
+          "row group relative min-w-0 cursor-pointer grid-cols-[16px_minmax(0,1fr)_28px] gap-x-3 px-2 py-2 sm:px-3",
           pending && "reading",
           fresh && "anim-enter",
-          flashClass,
+          flash && "flash-ring",
         )}
       >
-        {bookmark.favourite ? <span aria-hidden className="fold" style={{ borderTopWidth: 12, borderLeftWidth: 12, borderTopRightRadius: 5 }} /> : null}
-        {selectSlot}
-        <div className="flex min-w-0 items-center gap-2">
-          {/* A real link, so Tab reaches every row and the URL shows in the status bar; the click is handled by the row. */}
-          <a
-            href={bookmark.url}
-            onClick={(e) => e.preventDefault()}
-            onFocus={onFocus}
-            className={cn("min-w-0 truncate text-[15px] text-ink outline-none", unread ? "font-bold" : "font-medium", pending && !bookmark.summary && "text-ink-2")}
-          >
-            {title}
-          </a>
-          {health}
-          {tagInput}
+        <span className="flex h-[22px] items-center self-start">{selectSlot}</span>
+        <div className="min-w-0">
+          <div className="flex h-[22px] min-w-0 items-center gap-1.5">
+            {titleLink(cn("min-w-0 truncate text-[15px] leading-[22px] text-ink outline-none hover:underline", unread ? "font-semibold" : "font-normal", pending && !bookmark.summary && "text-ink-2"))}
+            {bookmark.favourite ? (
+              <Star key={starPops} size={12} aria-label="Starred" fill="var(--mark)" stroke="none" className={cn("shrink-0", starPops > 0 && "anim-star")} />
+            ) : null}
+            {tagInput}
+          </div>
+          {/* Line 2. Wide: summary, then · domain · age. Phones: domain · age first, summary after. */}
+          <div className="mt-0.5 flex h-5 min-w-0 items-baseline text-[13px] leading-5 text-ink-3">
+            {summary ? (
+              <span className={cn("min-w-0 truncate font-summary text-[14px] italic", !hadSummary && "anim-wipe")}>{summary}</span>
+            ) : failed ? (
+              <span className="min-w-0 truncate">Couldn&rsquo;t read this page</span>
+            ) : null}
+            <span className="flex min-w-0 shrink-0 items-baseline whitespace-pre max-sm:order-first max-sm:max-w-[75%]">
+              {lead ? <span className="max-sm:hidden"> · </span> : null}
+              <span className="min-w-0 truncate">{meta}</span>
+              {health ? <><span> · </span>{health}</> : null}
+              {lead ? <span className="sm:hidden"> · </span> : null}
+            </span>
+          </div>
         </div>
-        <span className="hidden min-w-0 items-center gap-1.5 text-[13px] text-ink-3 md:flex">
-          {unread ? <span aria-label="Unread" className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" /> : null}
-          <span className="truncate">{domain}</span>
-        </span>
-        {/* Tags that do not fit wrap onto a hidden second line, so none is cut mid-word. */}
-        <span className="hidden h-5 min-w-0 flex-wrap items-center gap-x-2 overflow-hidden md:flex">
-          {bookmark.tags.slice(0, 3).map((t) => (
-            <button key={t} type="button" className="tag shrink-0" data-active={state.tags.includes(t)} onClick={(e) => { e.stopPropagation(); toggleTag(t) }}>{t}</button>
-          ))}
-        </span>
-        <span className="text-right text-[12px] text-ink-3 tabular-nums">{age}</span>
-        <div onClick={(e) => e.stopPropagation()} className="hover-reveal touch-show flex justify-end">{menu}</div>
-        {/* Hover actions float over the tags and age on wide screens; touch uses the ⋯ menu. */}
-        <span className="card-actions pointer-events-none absolute inset-y-0 right-[40px] hidden items-center [@media(hover:hover)]:md:flex" data-focused={focused}>
+        <div onClick={(e) => e.stopPropagation()} className="hover-reveal touch-show flex items-center justify-end">{menu}</div>
+        {/* Hover actions float over the end of line 2, left of the ⋯; touch uses the ⋯ menu. */}
+        <span className="card-actions pointer-events-none absolute bottom-[6px] right-[44px] hidden items-center sm:right-[48px] [@media(hover:hover)]:md:flex" data-focused={focused}>
           <span className="card-buttons pointer-events-auto flex items-center gap-0.5 rounded-[6px] bg-surface-2 pl-2">
             {bookmark.readingMinutes ? <span className="mr-1 text-[12px] text-ink-3">{bookmark.readingMinutes} min read</span> : null}
             {starButton}
@@ -318,7 +363,7 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
         "card group relative flex min-w-0 cursor-pointer flex-col p-4 outline-none",
         pending && "reading",
         fresh && "anim-enter",
-        flashClass,
+        flash && "flash-ring",
       )}
     >
       {bookmark.favourite ? <span aria-hidden className="fold" /> : null}
@@ -332,15 +377,12 @@ export function IndexCard({ bookmark, layout, focused, pending, selected, fresh,
       </header>
 
       <h3 className={cn("mt-2 line-clamp-2 text-[17px] leading-snug tracking-[-0.01em]", unread ? "font-bold" : "font-semibold", pending && !bookmark.summary && "text-ink-2")}>
-        {/* A real link, so Tab reaches every card and the URL shows in the status bar; the click is handled by the card. */}
-        <a href={bookmark.url} onClick={(e) => e.preventDefault()} onFocus={onFocus} className="outline-none">
-          {title}
-        </a>
+        {titleLink("outline-none hover:underline")}
       </h3>
 
       {summary ? (
         <p className={cn("mt-1.5 line-clamp-2 font-summary text-[15px] italic leading-[1.45] text-ink-2", !hadSummary && "anim-wipe")}>{summary}</p>
-      ) : bookmark.enrichment === "failed" && !pending ? (
+      ) : failed ? (
         <p className="mt-1.5 text-[13px] text-ink-3">Couldn&rsquo;t read this page</p>
       ) : null}
 

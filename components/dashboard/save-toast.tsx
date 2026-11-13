@@ -3,8 +3,10 @@
 import { X } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
+import { usePresence } from "@/lib/client/use-presence"
 import { Favicon } from "@/components/favicon"
 import { useDashboard } from "./provider"
+import { CollectionSelect, TagEditor } from "./tag-editor"
 
 const STAY_MS = 9000
 
@@ -17,14 +19,10 @@ export function SaveToast() {
   const api = useDashboard()
   const [id, setId] = useState<string | null>(null)
   const [held, setHeld] = useState(false)
-  const [draft, setDraft] = useState("")
   const timer = useRef<number | undefined>(undefined)
 
   useEffect(() => {
-    const onSaved = (e: Event) => {
-      setId((e as CustomEvent<string>).detail)
-      setDraft("")
-    }
+    const onSaved = (e: Event) => setId((e as CustomEvent<string>).detail)
     window.addEventListener("bookmark-ai:saved", onSaved)
     return () => window.removeEventListener("bookmark-ai:saved", onSaved)
   }, [])
@@ -37,23 +35,23 @@ export function SaveToast() {
     return () => window.clearTimeout(timer.current)
   }, [id, held])
 
-  const bookmark = id ? api.state.bookmarks.find((b) => b.id === id) : undefined
+  const live = id ? api.state.bookmarks.find((b) => b.id === id) : undefined
+  // Stays mounted for the exit, showing the card as it was last seen.
+  const { item: bookmark, state } = usePresence(live)
   if (!bookmark) return null
   const pending = api.state.pending.has(bookmark.id)
-
-  const addTag = () => {
-    const value = draft.trim()
-    if (value) void api.addTag(bookmark.id, value)
-    setDraft("")
-  }
+  const close = () => { setId(null); setHeld(false) }
 
   return (
     <section
+      key={bookmark.id}
       aria-label="Saved"
       aria-live="polite"
+      data-state={state}
       className={cn(
-        "pop anim-rise fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 min-w-0 p-3 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[360px]",
+        "pop rise-anim fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 min-w-0 p-3 sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[360px]",
         pending && "reading",
+        state === "closed" && "pointer-events-none",
       )}
       onPointerEnter={() => setHeld(true)}
       onPointerLeave={() => setHeld(false)}
@@ -66,45 +64,12 @@ export function SaveToast() {
           <p className="text-[13px] text-ink-3">{pending ? "Saved. Reading the page…" : "Saved"}</p>
           <p className="truncate text-[15px] font-semibold">{bookmark.title}</p>
         </div>
-        <button type="button" className="btn btn-ghost btn-icon -mr-1 -mt-1 h-7 w-7" aria-label="Close" onClick={() => setId(null)}>
+        <button type="button" className="btn btn-ghost btn-icon -mr-1 -mt-1 h-7 w-7" aria-label="Close" onClick={close}>
           <X size={14} />
         </button>
       </div>
-
-      <div className="mt-2.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 pl-[26px]" data-editing="true">
-        {bookmark.tags.map((tag, i) => (
-          <span key={tag} className="stamp-group anim-stamp" style={{ "--i": i } as React.CSSProperties}>
-            <span className="tag cursor-default hover:no-underline">{tag}</span>
-            <button type="button" className="stamp-x !inline-flex" aria-label={`Remove tag ${tag}`} onClick={() => void api.removeTag(bookmark.id, tag)}>×</button>
-          </span>
-        ))}
-        <input
-          className="h-6 w-24 min-w-0 rounded-[4px] bg-surface-2 px-1.5 text-[13px] outline-none placeholder:text-ink-3 focus:shadow-[0_0_0_2px_var(--action)]"
-          placeholder="add tag"
-          aria-label="Add a tag"
-          maxLength={32}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); addTag() }
-            if (e.key === "Escape") setId(null)
-          }}
-        />
-      </div>
-
-      <label className="mt-2.5 flex min-w-0 items-center gap-2 pl-[26px] text-[13px] text-ink-2">
-        <span className="shrink-0">Collection</span>
-        <select
-          className="field h-8 min-w-0 flex-1 px-2 text-[13px]"
-          value={bookmark.collectionId ?? ""}
-          onChange={(e) => void api.patch(bookmark.id, { collectionId: e.target.value || null })}
-        >
-          <option value="">None</option>
-          {api.state.collections.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </label>
+      <TagEditor bookmark={bookmark} onEscape={close} className="mt-2.5 pl-[26px]" />
+      <CollectionSelect bookmark={bookmark} className="mt-2.5 pl-[26px]" />
     </section>
   )
 }

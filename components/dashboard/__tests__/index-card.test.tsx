@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { act, fireEvent, screen, waitFor } from "@testing-library/react"
 import { mountWithRepo } from "./harness"
 import { BookmarkGrid } from "../bookmark-grid"
+import { TopBar } from "../topbar"
 
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), loading: vi.fn() }) }))
 
@@ -22,13 +23,38 @@ const useGrid = () => window.localStorage.setItem("bookmark-ai:prefs", JSON.stri
 afterEach(() => window.localStorage.clear())
 
 describe("IndexCard", () => {
-  it("defaults to list rows: favicon, title, domain, tags, no summary label", async () => {
+  it("defaults to two-line list rows: linked title, serif summary, then domain and age; no tags, dot or fold", async () => {
     const { container } = await mountWithRepo(<BookmarkGrid />, seed)
-    expect(container.querySelector("li.row")).not.toBeNull()
-    expect(screen.getByText("postgresql.org")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /Full Text Search/ })).toHaveAttribute("href", seed[0]!.url)
-    expect(screen.getByRole("button", { name: "postgres" })).toBeInTheDocument()
+    const row = container.querySelector("li.row")!
+    expect(row).not.toBeNull()
+    const link = screen.getByRole("link", { name: /Full Text Search/ })
+    expect(link).toHaveAttribute("href", seed[0]!.url)
+    expect(link).toHaveAttribute("target", "_blank")
+    expect(link).toHaveClass("font-semibold")
+    expect(screen.getByText(/official tour/).className).toContain("font-summary")
+    expect(screen.getByText(/^postgresql\.org · /)).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "postgres" })).toBeNull()
+    expect(screen.queryByLabelText("Unread")).toBeNull()
+    expect(row.querySelector(".fold")).toBeNull()
     expect(screen.queryByText(/ai summary/i)).toBeNull()
+  })
+
+  it("marks a favourite row with a small yellow star after the title, not a fold", async () => {
+    const { container } = await mountWithRepo(<BookmarkGrid />, [{ ...seed[0]!, favourite: true }])
+    const star = screen.getByLabelText("Starred")
+    expect(star).toHaveAttribute("fill", "var(--mark)")
+    expect(container.querySelector(".fold")).toBeNull()
+  })
+
+  it("lists unread rows first in the Inbox, then a Read divider and the read ones", async () => {
+    await mountWithRepo(<BookmarkGrid />, [
+      { url: "https://a.example/read", title: "Already read", readAt: new Date().toISOString() },
+      { url: "https://b.example/new", title: "Still unread" },
+    ])
+    const titles = screen.getAllByRole("link").map((a) => a.textContent)
+    expect(titles).toEqual(["Still unread", "Already read"])
+    expect(screen.getByRole("separator", { name: "Read" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Already read" })).toHaveClass("font-normal")
   })
 
   it("renders the card anatomy in grid layout: summary in the serif, plain tags, reading time only in the actions", async () => {
@@ -75,7 +101,7 @@ describe("IndexCard", () => {
     const input = screen.getByPlaceholderText("tag, enter")
     fireEvent.change(input, { target: { value: "Database" } })
     fireEvent.keyDown(input, { key: "Enter" })
-    await waitFor(() => expect(screen.getByRole("button", { name: "database" })).toBeInTheDocument())
+    await waitFor(async () => expect((await repo.listBookmarks())[0]!.tags).toContain("database"))
     const after = (await repo.listBookmarks())[0]!
     expect(after.tags).toEqual(["postgres", "search", "database"])
     expect(before.tags).toEqual(["postgres", "search"])
@@ -92,9 +118,11 @@ describe("IndexCard", () => {
     expect(screen.queryByRole("button", { name: "<script>" })).toBeNull()
   })
 
-  it("highlights search hits with native <mark>", async () => {
-    const { container } = await mountWithRepo(<BookmarkGrid />, seed)
+  it("highlights the searched word with native <mark> inside the row summary", async () => {
+    const { container } = await mountWithRepo(<><TopBar onOpenPalette={() => {}} onOpenMenu={() => {}} /><BookmarkGrid /></>, seed)
     expect(container.querySelector("mark")).toBeNull()
-    expect(screen.getByRole("link", { name: /Full Text Search/ })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText("Search or paste a link"), { target: { value: "tsvector" } })
+    await waitFor(() => expect(container.querySelector("li.row mark")?.textContent).toBe("tsvector"))
+    expect(container.querySelector("li.row mark")!.closest(".font-summary")).not.toBeNull()
   })
 })
