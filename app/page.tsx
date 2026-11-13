@@ -7,21 +7,6 @@ import { FindStrip } from "@/components/landing/find-strip"
 
 const REPO = "https://github.com/meCeltic/Bookmark-AI"
 
-const FEATURES = [
-  {
-    title: "A summary and tags on save",
-    body: "Paste a link and the page is read for you: two lines on what it says and a few tags, written by Gemini and checked before they reach the card.",
-  },
-  {
-    title: "One word finds it",
-    body: "Type the word you remember. Search covers titles, summaries and tags, and forgives a typo.",
-  },
-  {
-    title: "Yours to organise and take",
-    body: "Group pages into collections, import the bookmarks file your browser exports, and export everything any time.",
-  },
-] as const
-
 const link = "underline decoration-line-strong underline-offset-4 hover:text-action hover:decoration-current"
 
 export default function Home() {
@@ -40,7 +25,7 @@ export default function Home() {
         <section className="pb-16 pt-14 sm:pb-20 sm:pt-24">
           {/* Inline weight/tracking: the unlayered h1 rule in globals.css would beat utility classes. */}
           <h1
-            className="isolate max-w-[13ch] text-[clamp(44px,7vw,96px)] leading-[0.95]"
+            className="isolate max-w-[11ch] text-[clamp(56px,8.5vw,132px)] leading-[0.92]"
             style={{ fontWeight: 900, letterSpacing: "-0.04em" }}
           >
             Save it now. Find it with <Mark animate className="ml-[0.08em]">one word</Mark>.
@@ -64,35 +49,23 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="border-t border-line py-14 sm:py-20" aria-labelledby="get-heading">
-          <h2 id="get-heading" className="text-[22px] font-bold">What you get</h2>
-          <div className="mt-8 grid gap-10 md:grid-cols-3 md:gap-12">
-            {FEATURES.map((f) => (
-              <div key={f.title}>
-                <h3 className="text-[17px] font-bold">{f.title}</h3>
-                <p className="mt-2 max-w-[40ch] text-[15px] leading-relaxed text-ink-2">{f.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="border-t border-line py-14 sm:py-20" aria-labelledby="stack-heading">
-          <h2 id="stack-heading" className="text-[22px] font-bold">For engineers</h2>
-          <p className="mt-3 max-w-[80ch] text-[15px] leading-relaxed text-ink-2">
-            Next.js, Supabase Postgres with row-level security, Gemini for summaries.{" "}
-            <a href={`${REPO}#how-it-works`} className={`${link} whitespace-nowrap text-ink`}>How it works &rarr;</a>
-          </p>
-          <p className="mt-2 text-[15px]">
-            <a href={REPO} className={`${link} text-ink`}>Source on GitHub</a>
+        <section className="border-t border-line py-14 sm:py-20">
+          <p className="max-w-[60ch] text-[22px] font-medium leading-snug">
+            Every link you save gets a two-line summary and tags written for you, one search box that finds it by any
+            word you remember, collections to group it, and an export whenever you want to take it all with you.
           </p>
         </section>
       </main>
 
-      <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line py-6 text-[13px] text-ink-3">
-        <span>
+      <footer className="flex flex-col gap-2 border-t border-line py-6 text-[13px] text-ink-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-6">
+        <p>
+          Next.js · Supabase Postgres (row-level security) · Gemini ·{" "}
+          <a href={`${REPO}#how-it-works`} className={`${link} whitespace-nowrap`}>How it works &rarr;</a> ·{" "}
+          <a href={REPO} className={link}>Source</a>
+        </p>
+        <p>
           Built by <a href="https://github.com/meCeltic" className={link}>Ankit Singh</a>
-        </span>
-        <Link href="/demo" className="hover:text-ink">Open the demo</Link>
+        </p>
       </footer>
     </div>
   )

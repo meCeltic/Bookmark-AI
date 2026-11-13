@@ -2,32 +2,35 @@ import type { ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 /**
- * The highlighter mark: a slightly irregular yellow swipe behind inline text.
- * It is the only brand device in the app. `animate` draws it in once from the left.
+ * The highlighter mark: a yellow felt-tip stroke behind inline text, sitting low
+ * with a ragged right end. It is the only brand device in the app.
+ * `animate` draws it in once from the left; `tilt` sets the stroke angle.
+ * Tilt uses the independent `rotate` property so the swipe-in transform keeps it.
  */
 export function Mark({
   children,
   className,
   animate = false,
+  tilt = "-1deg",
 }: {
   children: ReactNode
   className?: string
   animate?: boolean
+  tilt?: string
 }) {
   return (
-    <span className={cn("relative inline-block whitespace-nowrap", className)}>
+    <span className={cn("relative isolate inline-block whitespace-nowrap", className)}>
       <span
         aria-hidden
-        className={cn("absolute -inset-x-[0.12em] inset-y-[0.08em] -z-[1]", animate && "swipe-in")}
+        className={cn("absolute -inset-x-[0.1em] bottom-[0.02em] top-[0.36em] -z-[1]", animate && "swipe-in")}
         style={{
           background: "var(--mark)",
           mixBlendMode: "var(--mark-blend)" as never,
-          transform: "rotate(-1deg)",
-          borderRadius: "0.18em 0.3em 0.22em 0.35em / 0.5em 0.2em 0.5em 0.25em",
-          clipPath: "polygon(0.6% 8%, 99% 0%, 100% 92%, 1.5% 100%)",
+          rotate: tilt,
+          clipPath: "polygon(0 18%, 3% 4%, 97% 0, 100% 30%, 98% 88%, 94% 100%, 2% 92%)",
         }}
       />
-      <span className="relative">{children}</span>
+      <span className="relative" style={{ color: "var(--mark-ink)" }}>{children}</span>
     </span>
   )
 }

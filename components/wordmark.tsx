@@ -7,9 +7,9 @@ export function Wordmark({ className, href = "/" }: { className?: string; href?:
     <Link
       href={href}
       aria-label="Bookmark-AI home"
-      className={cn("inline-flex items-baseline text-[19px] font-bold tracking-[-0.03em] text-ink", className)}
+      className={cn("isolate inline-flex items-baseline text-[19px] font-bold tracking-[-0.03em] text-ink", className)}
     >
-      book<Mark>mark</Mark>
+      book<Mark tilt="-2deg">mark</Mark>
     </Link>
   )
 }
