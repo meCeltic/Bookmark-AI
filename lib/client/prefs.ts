@@ -39,3 +39,25 @@ export function writePrefs(patch: Partial<Prefs>): Prefs {
   }
   return next
 }
+
+/** One-time hints: a flag per name, remembered in this browser. */
+export type Flag = "saved-once" | "done-hint"
+const FLAG_KEY = (name: Flag) => `bookmark-ai:flag:${name}`
+
+export function readFlag(name: Flag): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return window.localStorage.getItem(FLAG_KEY(name)) === "1"
+  } catch {
+    return false
+  }
+}
+
+export function writeFlag(name: Flag): void {
+  try {
+    window.localStorage.setItem(FLAG_KEY(name), "1")
+  } catch {
+    // Private mode: the hint may show again, which is harmless.
+  }
+  window.dispatchEvent(new CustomEvent("bookmark-ai:flag", { detail: name }))
+}

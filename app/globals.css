@@ -276,7 +276,8 @@ mark {
     border-color: var(--action);
     background: color-mix(in oklab, var(--action-soft) 45%, var(--surface));
   }
-  .card[data-focused="true"] { border-color: var(--ink); }
+  .card[data-focused="true"],
+  .card[data-previewed="true"] { border-color: var(--ink); }
 
   /* Favourite: a folded yellow corner, top-right. */
   .fold {
@@ -285,8 +286,8 @@ mark {
     right: 0;
     width: 0;
     height: 0;
-    border-top: 18px solid var(--mark);
-    border-left: 18px solid transparent;
+    border-top: 14px solid var(--mark);
+    border-left: 14px solid transparent;
     border-top-right-radius: var(--radius-card);
     pointer-events: none;
   }
@@ -318,7 +319,19 @@ mark {
   .row:hover,
   .row:focus-within { background: var(--surface-2); }
   .row[data-selected="true"] { background: color-mix(in oklab, var(--action-soft) 60%, var(--surface)); }
+  .row[data-previewed="true"] { background: var(--surface-2); }
   .row[data-focused="true"] { box-shadow: inset 2px 0 0 var(--ink); }
+
+  /* Duplicate save / reveal: a yellow ring fades in and out; the card itself never blinks. */
+  .flash-ring::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 2px var(--mark);
+    pointer-events: none;
+    animation: flash-ring 1200ms var(--ease-enter) both;
+  }
 
   /* Action buttons: revealed on hover/focus where hover exists, always visible on touch. */
   .card-actions .card-buttons {
@@ -435,12 +448,33 @@ mark {
 }
 @keyframes star-pop {
   0%   { transform: scale(1); }
-  50%  { transform: scale(1.25); }
+  50%  { transform: scale(1.2); }
   100% { transform: scale(1); }
 }
 @keyframes countdown {
   from { transform: scaleX(1); }
   to   { transform: scaleX(0); }
+}
+@keyframes fade-scale {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes vt-exit {
+  to { opacity: 0; transform: scale(0.97); }
+}
+@keyframes pane-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+@keyframes flash-ring {
+  0%   { opacity: 0; }
+  15%  { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
 }
 @keyframes roll-in {
   from { opacity: 0; transform: translateY(6px); }
@@ -467,19 +501,51 @@ mark {
 [data-state="closed"].pop-anim { animation: pop-out 100ms var(--ease-exit) both; }
 [data-state="open"].fade-anim { animation: fade 120ms var(--ease-enter) both; }
 [data-state="closed"].fade-anim { animation: fade 100ms var(--ease-exit) reverse both; }
+/* Menus: a short fade and a hint of scale from the trigger, no travel. */
+[data-state="open"].menu-anim { animation: fade-scale 120ms var(--ease-move) both; }
+[data-state="closed"].menu-anim { animation: fade-scale 100ms var(--ease-exit) reverse both; }
+/* Bottom toasts and the bulk bar: rise in, sink out (they stay mounted 140ms for it). */
+[data-state="open"].rise-anim { animation: rise 200ms var(--ease-move) both; }
+[data-state="closed"].rise-anim { animation: rise 140ms var(--ease-exit) reverse both; }
+/* Preview: slides in from the right on wide screens, up as a sheet below lg. */
+[data-state="open"].pane-anim { animation: sheet-in 200ms var(--ease-move) both; }
+[data-state="closed"].pane-anim { animation: sheet-in 140ms var(--ease-exit) reverse both; }
+@media (min-width: 1024px) {
+  [data-state="open"].pane-anim { animation-name: pane-in; }
+  [data-state="closed"].pane-anim { animation-name: pane-in; }
+}
 
 /* Highlighter swipe: scales in from the left once. */
 .swipe-in { transform-origin: left center; animation: swipe 400ms var(--ease-move) 200ms both; }
 
 /* View transitions: cards slide, nothing else morphs. */
 ::view-transition-group(*) { animation-duration: 280ms; animation-timing-function: var(--ease-move); }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; }
+/* Snapshots keep their size and crop from the top left: grid<->list slides, never zooms text. */
+::view-transition-old(*),
+::view-transition-new(*) {
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+  overflow: clip;
+}
+/* A card that leaves shrinks away; a card that arrives just appears in its slot. */
+::view-transition-old(*):only-child { animation: vt-exit 140ms var(--ease-exit) both; }
+::view-transition-new(*):only-child { animation: none; }
+/* The page itself holds still, except for the theme switch, which crossfades. */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; }
+:root.vt-theme::view-transition-old(root),
+:root.vt-theme::view-transition-new(root) { animation: revert; animation-duration: 200ms; }
+:root.vt-theme * { view-transition-name: none !important; }
 
 @media (prefers-reduced-motion: reduce) {
   .anim-enter, .anim-rise, .anim-stamp, .anim-pop, .anim-wipe, .anim-star, .anim-roll, .swipe-in,
-  [data-state].pop-anim {
+  [data-state="open"].pop-anim, [data-state="open"].menu-anim, [data-state="open"].rise-anim, [data-state="open"].pane-anim {
     animation: fade 120ms var(--ease-enter) both;
     animation-delay: 0ms;
+  }
+  [data-state="closed"].pop-anim, [data-state="closed"].menu-anim, [data-state="closed"].rise-anim, [data-state="closed"].pane-anim {
+    animation: fade 100ms var(--ease-exit) reverse both;
   }
   .reading::before { animation: none; width: 100%; opacity: 0.5; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }

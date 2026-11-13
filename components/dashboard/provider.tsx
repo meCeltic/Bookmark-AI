@@ -24,9 +24,9 @@ import {
 import type { BookmarkRepository, RepositoryMode } from "@/lib/repo/types"
 import { materialize } from "@/lib/repo/shared"
 import { requestEnrichment, requestHealth } from "@/lib/client/enrich"
-import { readPrefs, writePrefs, type Layout } from "@/lib/client/prefs"
+import { readFlag, readPrefs, writeFlag, writePrefs, type Layout } from "@/lib/client/prefs"
 import { applyFilter, tagCounts, viewCounts, collectionCounts, isUnread, matchesView } from "@/lib/search/filter"
-import { withTransition } from "@/lib/client/transition"
+import { createLandingQueue, withTransition } from "@/lib/client/transition"
 import { createSearchIndex, searchBookmarks, type SearchHit } from "@/lib/search/rank"
 import { normalizeUrl, canonicalKey, domainOf } from "@/lib/url/normalize"
 import type { ImportedBookmark } from "@/lib/import/netscape"
@@ -54,6 +54,8 @@ interface State {
   fresh: Set<string>
   /** Bumped by changes the user caused (not hydration), so counters know when to roll. */
   rev: number
+  /** The card shown in the preview pane, if open. */
+  preview: string | null
 }
 
 type Action =
@@ -72,6 +74,7 @@ type Action =
   | { type: "healthFilter"; value: "dead" | null }
   | { type: "swap"; from: string; bookmark: Bookmark }
   | { type: "fresh"; key: string; on: boolean }
+  | { type: "preview"; id: string | null }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -96,7 +99,8 @@ function reducer(state: State, action: Action): State {
     case "remove": {
       const ids = new Set(action.ids)
       const selected = new Set([...state.selected].filter((id) => !ids.has(id)))
-      return { ...state, rev: state.rev + 1, bookmarks: state.bookmarks.filter((b) => !ids.has(b.id)), selected }
+      const preview = state.preview && ids.has(state.preview) ? null : state.preview
+      return { ...state, rev: state.rev + 1, bookmarks: state.bookmarks.filter((b) => !ids.has(b.id)), selected, preview }
     }
     case "pending": {
       const pending = new Set(state.pending)
@@ -116,7 +120,7 @@ function reducer(state: State, action: Action): State {
       return { ...state, selected }
     }
     case "view":
-      return { ...state, view: action.view, selected: new Set(), healthFilter: null }
+      return { ...state, view: action.view, selected: new Set(), healthFilter: null, preview: null }
     case "tags":
       return { ...state, tags: action.tags }
     case "query":
@@ -134,6 +138,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         pending,
+        preview: state.preview === action.from ? action.bookmark.id : state.preview,
         bookmarks: state.bookmarks.map((b) => (b.id === action.from ? action.bookmark : b)),
       }
     }
@@ -143,6 +148,8 @@ function reducer(state: State, action: Action): State {
       else fresh.delete(action.key)
       return { ...state, fresh }
     }
+    case "preview":
+      return state.preview === action.id ? state : { ...state, preview: action.id }
   }
 }
 
@@ -163,13 +170,16 @@ export interface DashboardApi {
   patchMany: (ids: string[], patch: BookmarkPatch, label: string, opts?: { move?: boolean }) => Promise<void>
   /** Mark read and archive in one step. */
   done: (ids: string[]) => Promise<void>
-  /** Archive, or restore when already archived. */
+  /** Move to Done without marking read, or restore to the Inbox. */
   toggleArchive: (bookmark: Bookmark) => Promise<void>
   /** Open a random unread card, weighted towards the oldest. */
   readSomething: () => void
   setLayout: (layout: Layout) => void
   remove: (ids: string[]) => Promise<void>
+  /** Open the link in a new tab and mark it read. */
   open: (bookmark: Bookmark) => void
+  /** Mark a card opened (the link itself opened elsewhere, e.g. a real <a>). */
+  markOpened: (bookmark: Bookmark) => void
   addTag: (id: string, tag: string) => Promise<void>
   removeTag: (id: string, tag: string) => Promise<void>
   renameTag: (from: string, to: string) => Promise<void>
@@ -221,6 +231,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     healthFilter: null,
     fresh: new Set<string>(),
     rev: 0,
+    preview: null,
   }))
   const [hydrated, setHydrated] = useState(mode === "cloud")
   const enrichAborts = useRef(new Map<string, AbortController>())
@@ -302,6 +313,9 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     [repo],
   )
 
+  // Summaries that arrive in the same frame land in one View Transition.
+  const land = useMemo(() => createLandingQueue(), [])
+
   const enrich = useCallback(
     async (bookmark: Bookmark, quiet = false): Promise<"ok" | "failed" | "rate-limited"> => {
       enrichAborts.current.get(bookmark.id)?.abort()
@@ -340,14 +354,21 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
           readingMinutes: e.readingMinutes,
           enrichment: e.source === "ai" ? "done" : e.source === "metadata" ? "fallback" : "failed",
         }
-        await applyRemotePatch(bookmark.id, patch, undefined, true)
+        const result = await repo.updateBookmark(bookmark.id, patch)
+        if (result.ok) {
+          // The summary and the end of the reading state land together, inside a transition.
+          await land(() => {
+            dispatch({ type: "upsert", bookmark: result.data })
+            dispatch({ type: "pending", id: bookmark.id, on: false })
+          })
+        }
         return "ok"
       } finally {
         if (enrichAborts.current.get(bookmark.id) === controller) enrichAborts.current.delete(bookmark.id)
         dispatch({ type: "pending", id: bookmark.id, on: false })
       }
     },
-    [applyRemotePatch],
+    [applyRemotePatch, repo, land],
   )
 
   // ---- public api ---------------------------------------------------------
@@ -448,6 +469,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       }
       // Swap the optimistic id for the real one before enrichment lands.
       dispatch({ type: "swap", from: optimistic.id, bookmark: result.data })
+      writeFlag("saved-once")
       window.dispatchEvent(new CustomEvent("bookmark-ai:saved", { detail: result.data.id }))
       void enrich(result.data)
       return result.data
@@ -512,7 +534,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
 
   const toggleArchive = useCallback<DashboardApi["toggleArchive"]>(
     async (b) => {
-      await patchMany([b.id], { archivedAt: b.archivedAt ? null : new Date().toISOString() }, b.archivedAt ? "restored" : "archived", { move: true })
+      await patchMany([b.id], { archivedAt: b.archivedAt ? null : new Date().toISOString() }, b.archivedAt ? "restored" : "moved to Done", { move: true })
     },
     [patchMany],
   )
@@ -549,13 +571,30 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     [repo, state.bookmarks],
   )
 
+  const markOpened = useCallback<DashboardApi["markOpened"]>(
+    (bookmark) => {
+      const stamp = new Date().toISOString()
+      const p: BookmarkPatch = { lastOpenedAt: stamp, readAt: bookmark.readAt ?? stamp }
+      const current = latest.current.find((b) => b.id === bookmark.id) ?? bookmark
+      // Becoming read moves the row into the Read group, so it slides there.
+      const run = bookmark.readAt ? (fn: () => void) => { fn(); return Promise.resolve() } : withTransition
+      void run(() => dispatch({ type: "upsert", bookmark: { ...current, ...p, updatedAt: stamp } })).then(() =>
+        applyRemotePatch(bookmark.id, p, current, true),
+      )
+      if (!bookmark.archivedAt && !readFlag("done-hint")) {
+        writeFlag("done-hint")
+        toast("Read it? Press d to clear it from your Inbox", { duration: 6000 })
+      }
+    },
+    [applyRemotePatch],
+  )
+
   const open = useCallback<DashboardApi["open"]>(
     (bookmark) => {
       window.open(bookmark.url, "_blank", "noopener,noreferrer")
-      const stamp = new Date().toISOString()
-      void patch(bookmark.id, { lastOpenedAt: stamp, readAt: bookmark.readAt ?? stamp }, { silent: true })
+      markOpened(bookmark)
     },
-    [patch],
+    [markOpened],
   )
 
   const readSomething = useCallback<DashboardApi["readSomething"]>(() => {
@@ -792,6 +831,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       setLayout,
       remove,
       open,
+      markOpened,
       addTag,
       removeTag,
       renameTag,
@@ -807,7 +847,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       reload,
     }),
     [
-      mode, state, visible, hits, counts, addBookmark, reEnrich, patch, patchMany, done, toggleArchive, readSomething, setLayout, remove, open, addTag, removeTag,
+      mode, state, visible, hits, counts, addBookmark, reEnrich, patch, patchMany, done, toggleArchive, readSomething, setLayout, remove, open, markOpened, addTag, removeTag,
       renameTag, createCollection, renameCollection, deleteCollection, importItems, readPending, checkHealth, reveal, resetDemo, reload,
     ],
   )

@@ -5,15 +5,21 @@ import { useTheme } from "next-themes"
 import { useMounted } from "@/lib/client/use-mounted"
 import { withTransition } from "@/lib/client/transition"
 
-/** Switch theme inside a root View Transition, so the page crossfades for 200ms. */
+/**
+ * Switch theme inside a root View Transition, so the page crossfades for 200ms.
+ * `vt-theme` on <html> turns the root crossfade on and every card name off for
+ * this one transition; other transitions leave the root still.
+ */
 export function switchTheme(setTheme: (theme: string) => void, next: "light" | "dark") {
+  const root = document.documentElement
+  root.classList.add("vt-theme")
   withTransition(() => {
     setTheme(next)
     // next-themes applies the class in an effect; set it here too so the new snapshot is right.
     document.documentElement.classList.toggle("dark", next === "dark")
     document.documentElement.classList.toggle("light", next === "light")
     document.documentElement.style.colorScheme = next
-  })
+  }, () => root.classList.remove("vt-theme"))
 }
 
 export function ThemeToggle({ className = "" }: { className?: string }) {

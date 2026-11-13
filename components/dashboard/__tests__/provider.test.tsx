@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { pickWeighted } from "../provider"
+import { createLandingQueue } from "@/lib/client/transition"
 
 describe("pickWeighted", () => {
   const list = ["oldest", "middle", "newest"]
@@ -14,5 +15,19 @@ describe("pickWeighted", () => {
   })
   it("returns the only item of a single list", () => {
     expect(pickWeighted(["only"], 0.7)).toBe("only")
+  })
+})
+
+describe("createLandingQueue", () => {
+  it("lands updates queued in the same frame together, in order, and resolves each", async () => {
+    const land = createLandingQueue()
+    const ran: string[] = []
+    const a = land(() => ran.push("a"))
+    const b = land(() => ran.push("b"))
+    expect(ran).toEqual([])
+    await Promise.all([a, b])
+    expect(ran).toEqual(["a", "b"])
+    await land(() => ran.push("c"))
+    expect(ran).toEqual(["a", "b", "c"])
   })
 })

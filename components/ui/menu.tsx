@@ -15,7 +15,7 @@ export function MenuContent({ children, className, ...props }: ComponentProps<ty
         sideOffset={6}
         align="end"
         // Grows from the trigger side; Radix sets the origin and data-state drives open/close.
-        className={cn("pop pop-anim z-50 min-w-[200px] origin-[var(--radix-dropdown-menu-content-transform-origin)] p-1 outline-none", className)}
+        className={cn("pop menu-anim z-50 min-w-[200px] origin-[var(--radix-dropdown-menu-content-transform-origin)] p-1 outline-none", className)}
         {...props}
       >
         {children}
@@ -47,7 +47,7 @@ export function MenuSub({ label, children }: { label: ReactNode; children: React
         <span className="ml-auto text-ink-3">›</span>
       </Menu.SubTrigger>
       <Menu.Portal>
-        <Menu.SubContent sideOffset={4} className="pop pop-anim z-50 min-w-[180px] origin-[var(--radix-dropdown-menu-content-transform-origin)] p-1 outline-none">
+        <Menu.SubContent sideOffset={4} className="pop menu-anim z-50 min-w-[180px] origin-[var(--radix-dropdown-menu-content-transform-origin)] p-1 outline-none">
           {children}
         </Menu.SubContent>
       </Menu.Portal>
