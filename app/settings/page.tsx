@@ -17,13 +17,13 @@ export default async function SettingsPage() {
   const { count } = await supabase.from("bookmarks").select("id", { count: "exact", head: true })
 
   return (
-    <div className="mx-auto max-w-[720px] px-5 py-6 sm:px-8">
-      <header className="flex items-center justify-between">
+    <div className="mx-auto w-full max-w-[640px] px-4 pb-20 pt-5 sm:px-8">
+      <header className="flex h-11 items-center justify-between gap-4">
         <Wordmark href="/dashboard" />
-        <Link href="/dashboard" className="btn btn-ghost btn-sm"><ArrowLeft size={14} /> Back to the drawer</Link>
+        <Link href="/dashboard" className="btn btn-ghost btn-sm -mr-2.5"><ArrowLeft size={14} /> Back to your pages</Link>
       </header>
-      <h1 className="mt-10 font-display text-[30px] font-medium">Settings</h1>
-      <div className="mt-8">
+      <h1 className="mt-12 text-[32px] leading-tight" style={{ fontWeight: 700, letterSpacing: "-0.02em" }}>Settings</h1>
+      <div className="mt-10">
         <SettingsPanel email={data.user.email ?? ""} bookmarkCount={count ?? 0} />
       </div>
     </div>

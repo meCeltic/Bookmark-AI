@@ -29,7 +29,18 @@ The first version of this repo was a weekend take-home from 2025. It had a Supab
 | --- | --- | --- |
 | ![dark](public/screenshots/dashboard-dark.png) | ![palette](public/screenshots/command-palette.png) | ![mobile](public/screenshots/mobile.png) |
 
-## How it is built
+## How it works
+
+### How a card gets written
+
+When you paste a link, the server reads the page once and writes the card from what it finds. The fetch goes through a guard that only allows http(s), resolves the hostname and refuses private, loopback and link-local addresses, follows at most three redirects and re-checks each one, stops reading after 1 MiB and gives the whole exchange five seconds. From the HTML it takes the title (Open Graph first, then Twitter, then `<title>`), the favicon and preview image, the article or main text with entities decoded, and an estimated reading time.
+
+About six kilobytes of that text goes to Gemini with a fixed JSON schema in the request. The reply is parsed again by a Zod schema that caps lengths, keeps three to five tags in a safe character set and restricts the category to a fixed list. If there is no API key, the quota is spent or the reply does not fit the schema, the card falls back to the page's own description and records that it did, so the UI never presents a fallback as an AI summary.
+
+Before the card is filed, the URL is canonicalised: `utm_*` parameters, `www.`, the fragment and a trailing slash are removed. A unique index on the canonical URL per user means a duplicate is refused by Postgres rather than by a check in JavaScript, and a generated full-text search vector over title, summary, tags and URL is kept up to date by the database.
+
+### How the app is put together
+
 
 ```
 Next.js 16 (App Router)            Supabase
