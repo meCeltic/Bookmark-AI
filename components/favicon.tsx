@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { domainOf } from "@/lib/url/normalize"
 import { cn } from "@/lib/utils"
+import { isBlankIcon, PROBE_MAX_PX } from "@/lib/client/blank-icon"
 
 interface Props {
   url: string
@@ -11,34 +12,68 @@ interface Props {
   className?: string
 }
 
-/** 16px favicon with a letter fallback on the inset surface. No globe icons. */
-export function Favicon({ url, src, size = 16, className }: Props) {
-  const [failed, setFailed] = useState(false)
-  const letter = (domainOf(url) || "?").charAt(0).toUpperCase()
-  if (!src || failed) {
-    return (
-      <span
-        aria-hidden
-        className={cn("inline-flex shrink-0 items-center justify-center bg-surface-2 text-[10px] font-semibold text-ink-2", className)}
-        style={{ width: size, height: size, borderRadius: 3 }}
-      >
-        {letter}
-      </span>
-    )
-  }
+type Status = "loading" | "ok" | "failed"
+
+/** The lettered tile: the domain's first letter on the inset surface. No globe icons. */
+export function FaviconTile({ url, size = 16, className }: { url: string; size?: number; className?: string }) {
+  const letter = (domainOf(url) || url.replace(/^[a-z]+:\/\//i, "") || "?").replace(/^www\./, "").charAt(0).toUpperCase() || "?"
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt=""
-      width={size}
-      height={size}
-      loading="lazy"
-      referrerPolicy="no-referrer"
-      onError={() => setFailed(true)}
-      onLoad={(e) => { if (e.currentTarget.naturalWidth === 0) setFailed(true) }}
-      className={cn("shrink-0 rounded-[3px] object-contain", className)}
-      style={{ width: size, height: size }}
-    />
+    <span
+      aria-hidden
+      data-favicon-tile=""
+      className={cn("inline-flex shrink-0 select-none items-center justify-center bg-surface-2 font-bold leading-none text-ink-2", className)}
+      // The hairline keeps the tile visible on a lit (surface-2) row too.
+      style={{ width: size, height: size, borderRadius: Math.round(size / 5), fontSize: Math.round(size * 0.62), boxShadow: "inset 0 0 0 1px var(--line)" }}
+    >
+      {letter}
+    </span>
+  )
+}
+
+/**
+ * 16px favicon. The lettered tile shows until the icon has really loaded, and stays when the
+ * URL is missing or fails (including a failure before hydration, when React's onError never
+ * fires) or loads with no visible pixels (lib/client/blank-icon), so the slot is never empty.
+ */
+export function Favicon({ url, src, size = 16, className }: Props) {
+  const [state, setState] = useState<{ src: string | null; status: Status }>({ src, status: "loading" })
+  // A new icon URL starts over (adjusting state during render, not in an effect).
+  if (state.src !== src) setState({ src, status: "loading" })
+  const status = state.src === src ? state.status : "loading"
+  const settle = useCallback((img: HTMLImageElement) => {
+    const at = img.getAttribute("src")
+    const next: Status = img.naturalWidth > 0 ? "ok" : "failed"
+    setState((s) => (s.src === at && s.status !== next ? { ...s, status: next } : s))
+    // A small icon that loads but has no visible pixels is a failure too.
+    if (next === "ok" && at && img.naturalWidth <= PROBE_MAX_PX) {
+      void isBlankIcon(at).then((blank) => {
+        if (blank) setState((s) => (s.src === at ? { ...s, status: "failed" } : s))
+      })
+    }
+  }, [])
+  // The image may have loaded or failed before React attached its handlers.
+  const ref = useCallback((img: HTMLImageElement | null) => {
+    if (img?.complete) settle(img)
+  }, [settle])
+
+  if (!src || status === "failed") return <FaviconTile url={url} size={size} className={className} />
+  return (
+    <span className={cn("relative inline-flex shrink-0", className)} style={{ width: size, height: size }}>
+      {status === "ok" ? null : <FaviconTile url={url} size={size} className="absolute inset-0" />}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={ref}
+        src={src}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setState((s) => (s.src === src ? { ...s, status: "failed" } : s))}
+        onLoad={(e) => settle(e.currentTarget)}
+        className={cn("relative rounded-[3px] object-contain", status === "ok" ? "opacity-100" : "opacity-0")}
+        style={{ width: size, height: size }}
+      />
+    </span>
   )
 }
