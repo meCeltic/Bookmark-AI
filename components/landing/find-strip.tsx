@@ -71,7 +71,8 @@ export function FindStrip() {
             </span>
           ))}
         </span>
-        <span className="ml-auto text-[13px] text-ink-3">1 match</span>
+        {/* Every row stays in view (the others dimmed), so the count says which of them matched. */}
+        <span className="ml-auto text-[13px] text-ink-3">1 of {ROWS.length} pages</span>
       </div>
       <p className="sr-only">Searching a drawer of saved pages for one word, such as easing, rls or branches, finds the page that mentions it.</p>
       <ul className="mt-3">
@@ -87,7 +88,7 @@ export function FindStrip() {
               </span>
               <div className="min-w-0">
                 <div className="flex items-baseline gap-2">
-                  <span className={`truncate text-[15px] font-semibold transition-colors duration-200 ${on ? "text-ink" : "text-ink-3"}`}>{row.title}</span>
+                  <span className={`line-clamp-2 min-w-0 text-[15px] font-semibold leading-snug transition-colors duration-200 ${on ? "text-ink" : "text-ink-3"}`}>{row.title}</span>
                   <span className="shrink-0 text-[13px] text-ink-3">{row.domain}</span>
                 </div>
                 <p className={`mt-1 font-summary text-[17px] italic leading-snug transition-colors duration-200 ${on ? "text-ink-2" : "text-ink-3"}`}>
