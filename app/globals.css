@@ -1,43 +1,47 @@
 @import "tailwindcss";
 
 /* ------------------------------------------------------------------ tokens */
-/* "The index card desk": paper tones, hairlines, one ink-stamp accent.      */
+/* "Highlighter": white paper, black ink, one yellow mark, one blue action.   */
 
 :root {
-  --bg: #f4f1ea;
-  --surface: #fbfaf6;
-  --surface-2: #ece8df;
-  --border: #d9d3c6;
-  --border-strong: #b9b2a3;
-  --text: #1c1a17;
-  --text-2: #6b655b;
-  --text-3: #857d6f;
-  --accent: #b5412f;
-  --accent-ink: #fbfaf6;
-  --accent-soft: #f3dcd6;
-  --danger: #8f2a1c;
-  --ok: #3b6d3f;
-  --shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 8px 24px -16px rgba(28, 26, 23, 0.35);
-  --grain-opacity: 0.035;
+  --bg: #fafaf7;
+  --surface: #ffffff;
+  --surface-2: #f1f0eb;
+  --line: #e3e1da;
+  --line-strong: #c9c6bd;
+  --ink: #111216;
+  --ink-2: #565a64;
+  --ink-3: #8a8d95;
+  --mark: #ffd84a;
+  --mark-soft: #fff3bf;
+  --action: #1e3bd1;
+  --action-ink: #ffffff;
+  --action-soft: #e8ecfb;
+  --danger: #c8331e;
+  --ok: #1f7a4a;
+  --shadow-pop: 0 8px 30px -12px rgba(17, 18, 22, 0.22), 0 1px 2px rgba(17, 18, 22, 0.06);
+  --mark-blend: multiply;
   color-scheme: light;
 }
 
 .dark {
-  --bg: #141311;
-  --surface: #1e1c19;
-  --surface-2: #191714;
-  --border: #2e2a25;
-  --border-strong: #4a443c;
-  --text: #ece7dc;
-  --text-2: #9a9284;
-  --text-3: #7d7566;
-  --accent: #d8634e;
-  --accent-ink: #141311;
-  --accent-soft: #3a221d;
-  --danger: #e07a6b;
-  --ok: #7fae82;
-  --shadow: 0 1px 0 rgba(0, 0, 0, 0.3), 0 8px 24px -16px rgba(0, 0, 0, 0.8);
-  --grain-opacity: 0.05;
+  --bg: #0e0f11;
+  --surface: #16171a;
+  --surface-2: #1d1f23;
+  --line: #2a2c31;
+  --line-strong: #3b3e45;
+  --ink: #f3f2ed;
+  --ink-2: #a2a5ad;
+  --ink-3: #6e717a;
+  --mark: #f5cf3a;
+  --mark-soft: #3d3514;
+  --action: #8ea2ff;
+  --action-ink: #0e0f11;
+  --action-soft: #1d2440;
+  --danger: #ff7a66;
+  --ok: #5bc48a;
+  --shadow-pop: 0 8px 30px -12px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --mark-blend: normal;
   color-scheme: dark;
 }
 
@@ -45,111 +49,139 @@
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
-  --color-border: var(--border);
-  --color-border-strong: var(--border-strong);
-  --color-ink: var(--text);
-  --color-ink-2: var(--text-2);
-  --color-ink-3: var(--text-3);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-accent-soft: var(--accent-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-mark: var(--mark);
+  --color-mark-soft: var(--mark-soft);
+  --color-action: var(--action);
+  --color-action-ink: var(--action-ink);
+  --color-action-soft: var(--action-soft);
   --color-danger: var(--danger);
   --color-ok: var(--ok);
+  /* Legacy aliases kept while components migrate; prefer the names above. */
+  --color-border: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-accent: var(--action);
+  --color-accent-ink: var(--action-ink);
+  --color-accent-soft: var(--action-soft);
 
-  --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
-  --font-sans: var(--font-source-sans), "Helvetica Neue", Arial, sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: var(--font-schibsted), "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-schibsted), "Helvetica Neue", Arial, sans-serif;
+  --font-summary: var(--font-newsreader), "Iowan Old Style", Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --radius-card: 2px;
-  --shadow-card: var(--shadow);
+  --radius-card: 8px;
+  --radius-btn: 6px;
+  --shadow-pop: var(--shadow-pop);
+  --shadow-card: none;
 
   --ease-enter: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-move: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-stamp: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* ------------------------------------------------------------------- base */
 
 html {
   background: var(--bg);
-  color: var(--text);
+  color: var(--ink);
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
 }
 
 body {
   min-height: 100dvh;
-  position: relative;
-}
-
-/* Paper grain: an SVG noise layer at 3-5%, never a gradient. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: -1;
-  opacity: var(--grain-opacity);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-  background-size: 160px 160px;
 }
 
 ::selection {
-  background: var(--accent-soft);
-  color: var(--text);
+  background: var(--mark);
+  color: var(--ink);
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--action);
   outline-offset: 2px;
-}
-/* Text inputs show focus with their accent rule, not a box. */
-input:focus-visible,
-textarea:focus-visible {
-  outline: none;
+  border-radius: 4px;
 }
 
 h1, h2, h3 {
-  font-family: var(--font-display);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
+a { text-underline-offset: 3px; }
+
+/* Native <mark> is the highlighter too, for search hits inside text. */
+mark {
+  background: var(--mark);
+  color: var(--ink);
+  padding: 0 0.08em;
+  margin: 0 -0.08em;
+  border-radius: 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 @layer components {
+  /* Small label: sentence case, never uppercase, never mono. */
   .meta {
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-2);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .meta-xs {
+    font-size: 12px;
+    color: var(--ink-3);
   }
 
-  .hairline {
-    border-color: var(--border);
-  }
+  .hairline { border-color: var(--line); }
 
-  /* Bottom-ruled input: the only input style in the app. */
+  /* Filled field: the one input style in the app. */
+  .field,
   .rule-input {
     width: 100%;
-    background: transparent;
-    border: 0;
-    border-bottom: 1px solid var(--border-strong);
-    padding: 8px 0;
-    color: var(--text);
+    height: 40px;
+    padding: 0 12px;
+    background: var(--surface-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-card);
+    color: var(--ink);
     font: inherit;
-    border-radius: 0;
-    transition: border-color 120ms var(--ease-enter);
+    transition: background-color 90ms var(--ease-enter), box-shadow 90ms var(--ease-enter), border-color 90ms var(--ease-enter);
   }
-  .rule-input::placeholder {
-    color: var(--text-3);
-  }
+  .field::placeholder,
+  .rule-input::placeholder { color: var(--ink-3); }
+  .field:hover,
+  .rule-input:hover { background: color-mix(in oklab, var(--surface-2) 70%, var(--surface)); }
+  .field:focus,
   .rule-input:focus {
     outline: none;
-    border-bottom-color: var(--accent);
+    background: var(--surface);
+    border-color: var(--action);
+    box-shadow: 0 0 0 3px var(--action-soft);
   }
+  .field-bare {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    height: auto;
+    outline: none;
+    font: inherit;
+    color: var(--ink);
+  }
+  .field-bare::placeholder { color: var(--ink-3); }
 
   .btn {
     display: inline-flex;
@@ -158,124 +190,143 @@ h1, h2, h3 {
     gap: 8px;
     height: 36px;
     padding: 0 14px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-card);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-btn);
     background: var(--surface);
-    color: var(--text);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 500;
     font-size: 14px;
     line-height: 1;
     white-space: nowrap;
     cursor: pointer;
-    transition: border-color 120ms var(--ease-enter), background-color 120ms var(--ease-enter), color 120ms var(--ease-enter);
+    transition: border-color 90ms var(--ease-enter), background-color 90ms var(--ease-enter), color 90ms var(--ease-enter);
   }
-  .btn:hover {
-    border-color: var(--text-2);
-  }
-  .btn:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
+  .btn:hover { border-color: var(--ink-3); background: var(--surface-2); }
+  .btn:active { background: color-mix(in oklab, var(--surface-2) 80%, var(--ink)); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
   .btn-primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: var(--accent-ink);
+    background: var(--action);
+    border-color: var(--action);
+    color: var(--action-ink);
+    font-weight: 600;
   }
   .btn-primary:hover {
-    background: color-mix(in oklab, var(--accent) 88%, black);
-    border-color: color-mix(in oklab, var(--accent) 88%, black);
+    background: color-mix(in oklab, var(--action) 86%, black);
+    border-color: color-mix(in oklab, var(--action) 86%, black);
   }
-  .btn-ghost {
-    border-color: transparent;
-    background: transparent;
-  }
-  .btn-ghost:hover {
-    background: var(--surface-2);
-    border-color: transparent;
-  }
-  .btn-sm {
-    height: 30px;
-    padding: 0 10px;
-    font-size: 13px;
-  }
-  .btn-icon {
-    width: 32px;
-    height: 32px;
-    padding: 0;
-  }
+  .btn-ghost { border-color: transparent; background: transparent; color: var(--ink-2); }
+  .btn-ghost:hover { background: var(--surface-2); border-color: transparent; color: var(--ink); }
+  .btn-sm { height: 30px; padding: 0 10px; font-size: 13px; }
+  .btn-icon { width: 32px; height: 32px; padding: 0; }
 
-  /* Tag stamp: mono, 1px accent outline, the only pill in the app. */
+  /* Tag: plain text, hash first. The highlighter marks the active one. */
+  .tag,
   .stamp {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 0;
     height: 20px;
-    padding: 0 7px;
-    border: 1px solid var(--accent);
-    border-radius: 999px;
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    letter-spacing: 0.04em;
+    padding: 0 2px;
+    border: 0;
+    border-radius: 2px;
+    color: var(--ink-3);
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0;
     line-height: 1;
     white-space: nowrap;
     background: transparent;
     cursor: pointer;
-    transition: background-color 120ms var(--ease-enter), color 120ms var(--ease-enter);
+    text-decoration: none;
+    text-underline-offset: 3px;
+    transition: color 90ms var(--ease-enter), background-color 90ms var(--ease-enter);
   }
-  .stamp:hover,
+  .tag::before,
+  .stamp::before { content: "#"; opacity: 0.7; margin-right: 1px; }
+  .tag:hover,
+  .stamp:hover { color: var(--ink); text-decoration: underline; }
+  .tag[data-active="true"],
   .stamp[data-active="true"] {
-    background: var(--accent);
-    color: var(--accent-ink);
+    background: var(--mark);
+    color: var(--ink);
+    text-decoration: none;
   }
-  .stamp-quiet {
-    border-color: var(--border-strong);
-    color: var(--text-2);
-  }
-  .stamp-quiet:hover {
-    background: var(--surface-2);
-    color: var(--text);
-  }
+  .stamp-quiet { color: var(--ink-3); }
+  .stamp-quiet:hover { color: var(--ink); }
 
   .card {
     background: var(--surface);
-    border: 1px solid var(--border);
+    border: 1px solid var(--line);
     border-radius: var(--radius-card);
-    transition: border-color 120ms var(--ease-enter), box-shadow 120ms var(--ease-enter);
+    transition: border-color 90ms var(--ease-enter), background-color 90ms var(--ease-enter);
   }
   .card:hover,
-  .card:focus-within,
+  .card:focus-within { border-color: var(--line-strong); }
   .card[data-selected="true"] {
-    border-color: var(--border-strong);
-    box-shadow: var(--shadow-card);
+    border-color: var(--action);
+    background: color-mix(in oklab, var(--action-soft) 45%, var(--surface));
   }
-  .card[data-selected="true"] {
-    border-color: var(--accent);
+  .card[data-focused="true"] { border-color: var(--ink); }
+
+  /* Favourite: a folded yellow corner, top-right. */
+  .fold {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-top: 18px solid var(--mark);
+    border-left: 18px solid transparent;
+    border-top-right-radius: var(--radius-card);
+    pointer-events: none;
   }
 
-  /* Action buttons: revealed on hover/focus where hover exists, always visible on touch.
-     The status text next to them stays visible so the row never reads as dead space. */
+  /* Reading state: a hairline travels the top edge until the summary lands. */
+  .reading {
+    position: relative;
+    overflow: hidden;
+  }
+  .reading::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 2px;
+    width: 40%;
+    background: var(--action);
+    animation: travel 1.4s linear infinite;
+  }
+
+  /* Row (list view). */
+  .row {
+    display: grid;
+    align-items: center;
+    min-height: 44px;
+    border-radius: var(--radius-btn);
+    transition: background-color 90ms var(--ease-enter);
+  }
+  .row:hover,
+  .row:focus-within { background: var(--surface-2); }
+  .row[data-selected="true"] { background: color-mix(in oklab, var(--action-soft) 60%, var(--surface)); }
+  .row[data-focused="true"] { box-shadow: inset 2px 0 0 var(--ink); }
+
+  /* Action buttons: revealed on hover/focus where hover exists, always visible on touch. */
   .card-actions .card-buttons {
     opacity: 0;
-    transition: opacity 120ms var(--ease-enter);
+    transition: opacity 90ms var(--ease-enter);
   }
   .group:hover .card-buttons,
   .group:focus-within .card-buttons,
-  .card-actions[data-focused="true"] .card-buttons {
-    opacity: 1;
-  }
-  /* Controls that appear on hover where hover exists, and are simply there on touch. */
+  .card-actions[data-focused="true"] .card-buttons { opacity: 1; }
   .hover-reveal {
     opacity: 0;
-    transition: opacity 120ms var(--ease-enter);
+    transition: opacity 90ms var(--ease-enter);
   }
   .group:hover .hover-reveal,
   .group:focus-within .hover-reveal,
   .hover-reveal[data-state="open"],
-  .hover-reveal[aria-checked="true"] {
-    opacity: 1;
-  }
-  /* Selection check: takes the favicon's slot on hover or while selecting. */
+  .hover-reveal[aria-checked="true"] { opacity: 1; }
+  /* Selection check: crossfades into the favicon's slot. */
   .select-slot {
     position: relative;
     display: inline-flex;
@@ -283,63 +334,50 @@ h1, h2, h3 {
     height: 16px;
     flex-shrink: 0;
   }
-  .select-slot .select-check {
-    position: absolute;
-    inset: 0;
-  }
-  .select-slot .select-icon {
-    transition: opacity 120ms var(--ease-enter);
-  }
+  .select-slot .select-check { position: absolute; inset: 0; transition: opacity 120ms var(--ease-enter); }
+  .select-slot .select-icon { transition: opacity 120ms var(--ease-enter); }
   .group:hover .select-slot .select-icon,
-  .select-slot[data-selecting="true"] .select-icon {
-    opacity: 0;
-  }
+  .select-slot[data-selecting="true"] .select-icon { opacity: 0; }
 
-  /* Tag stamp with a removable tail: the × is a sibling button that appears on hover. */
-  .stamp-group {
-    display: inline-flex;
-    align-items: stretch;
-  }
-  .stamp-group:hover .stamp {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    border-right-width: 0;
-  }
+  /* Removable tag: the × shows on hover. */
+  .stamp-group { display: inline-flex; align-items: center; gap: 2px; }
   .stamp-x {
     display: none;
     align-items: center;
     height: 20px;
-    padding: 0 6px 0 4px;
-    border: 1px solid var(--accent);
-    border-radius: 0 999px 999px 0;
-    color: var(--accent);
-    font-family: var(--font-mono);
-    font-size: 10.5px;
+    padding: 0 3px;
+    border: 0;
+    border-radius: 2px;
+    color: var(--ink-3);
+    font-size: 12px;
     line-height: 1;
     background: transparent;
     cursor: pointer;
   }
-  .stamp-group:hover .stamp-x {
-    display: inline-flex;
-  }
-  .stamp-x:hover {
-    background: var(--danger);
-    border-color: var(--danger);
-    color: var(--accent-ink);
-  }
+  .stamp-group:hover .stamp-x { display: inline-flex; }
+  .stamp-x:hover { color: var(--danger); }
 
   .kbd {
     display: inline-flex;
     align-items: center;
     height: 18px;
     padding: 0 5px;
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--line-strong);
     border-bottom-width: 2px;
-    border-radius: 3px;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-2);
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-2);
     background: var(--surface);
+  }
+
+  /* Overlays */
+  .pop {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-pop);
   }
 
   .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -347,53 +385,98 @@ h1, h2, h3 {
 }
 
 /* ----------------------------------------------------------------- motion */
-/* One place defines every entrance. Reduced motion zeroes all of it.        */
+/* One place defines every animation. Reduced motion keeps only short fades. */
 
 @keyframes enter {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes stamp-in {
   from { opacity: 0; transform: scale(0.9) rotate(-2deg); }
-  60%  { transform: scale(1.02) rotate(0.5deg); }
   to   { opacity: 1; transform: none; }
 }
 @keyframes pop {
-  from { opacity: 0; transform: scale(0.98); }
+  from { opacity: 0; transform: scale(0.98) translateY(-4px); }
   to   { opacity: 1; transform: none; }
 }
-@keyframes blink {
-  50% { opacity: 0; }
+@keyframes pop-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: scale(0.98); }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes travel {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%); }
+}
+@keyframes wipe {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+@keyframes swipe {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+@keyframes star-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+@keyframes roll-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .anim-enter {
-  animation: enter 180ms var(--ease-enter) both;
+  animation: enter 220ms var(--ease-move) both;
   animation-delay: calc(var(--i, 0) * 30ms);
 }
+.anim-rise { animation: rise 200ms var(--ease-move) both; }
 .anim-stamp {
-  animation: stamp-in 220ms var(--ease-enter) both;
+  animation: stamp-in 220ms var(--ease-stamp) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
-.anim-pop {
-  animation: pop 140ms var(--ease-enter) both;
-}
-.caret::after {
-  content: "▍";
-  color: var(--accent);
-  animation: blink 900ms steps(1) infinite;
-}
+.anim-pop { animation: pop 160ms var(--ease-move) both; }
+.anim-fade { animation: fade 150ms var(--ease-enter) both; }
+.anim-wipe { animation: wipe 360ms var(--ease-enter) both; }
+.anim-star { animation: star-pop 220ms var(--ease-stamp); }
+.anim-roll { animation: roll-in 160ms var(--ease-move) both; }
+
+/* Overlays driven by data-state (Radix style). */
+[data-state="open"].pop-anim { animation: pop 160ms var(--ease-move) both; }
+[data-state="closed"].pop-anim { animation: pop-out 100ms var(--ease-exit) both; }
+[data-state="open"].fade-anim { animation: fade 120ms var(--ease-enter) both; }
+[data-state="closed"].fade-anim { animation: fade 100ms var(--ease-exit) reverse both; }
+
+/* Highlighter swipe: scales in from the left once. */
+.swipe-in { transform-origin: left center; animation: swipe 400ms var(--ease-move) 200ms both; }
+
+/* View transitions: cards slide, nothing else morphs. */
+::view-transition-group(*) { animation-duration: 280ms; animation-timing-function: var(--ease-move); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 200ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.001ms !important;
-    animation-delay: 0ms !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
+  .anim-enter, .anim-rise, .anim-stamp, .anim-pop, .anim-wipe, .anim-star, .anim-roll, .swipe-in,
+  [data-state].pop-anim {
+    animation: fade 120ms var(--ease-enter) both;
+    animation-delay: 0ms;
   }
-  .anim-enter, .anim-stamp, .anim-pop { animation: none; }
+  .reading::before { animation: none; width: 100%; opacity: 0.5; }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  html { scroll-behavior: auto !important; }
 }
 
-/* Scrollbars in the sidebar should be quiet. */
-.quiet-scroll { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.quiet-scroll { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
 
 /* ------------------------------------------------------------------ touch */
 /* Unlayered on purpose: these must win over utility classes.                */
@@ -409,8 +492,7 @@ h1, h2, h3 {
   .select-slot .select-check { opacity: 0; }
   .select-slot[data-selecting="true"] .select-check { opacity: 1; }
   [data-editing="true"] .stamp-group .stamp-x { display: inline-flex; }
-  [data-editing="true"] .stamp-group .stamp { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right-width: 0; }
-  .stamp, .stamp-x { height: 26px; padding-left: 10px; padding-right: 10px; font-size: 11.5px; }
+  .tag, .stamp, .stamp-x { height: 28px; font-size: 14px; }
   .btn-icon.h-7, .btn-icon.h-6 { width: 36px !important; height: 36px !important; }
   .btn-sm { height: 36px; }
 }

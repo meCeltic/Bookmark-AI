@@ -1,25 +1,19 @@
 import type { Metadata, Viewport } from "next"
-import { Fraunces, JetBrains_Mono, Source_Sans_3 } from "next/font/google"
+import { Newsreader, Schibsted_Grotesk } from "next/font/google"
 import { ThemeProvider } from "next-themes"
 import { Toaster } from "sonner"
 import "./globals.css"
 
-const fraunces = Fraunces({
+const schibsted = Schibsted_Grotesk({
   subsets: ["latin"],
-  variable: "--font-fraunces",
-  axes: ["opsz", "WONK", "SOFT"],
-  style: ["normal", "italic"],
+  variable: "--font-schibsted",
+  weight: ["400", "500", "600", "700", "900"],
   display: "swap",
 })
-const sourceSans = Source_Sans_3({
+const newsreader = Newsreader({
   subsets: ["latin"],
-  variable: "--font-source-sans",
-  weight: ["400", "600"],
-  display: "swap",
-})
-const jetbrains = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-jetbrains",
+  variable: "--font-newsreader",
+  style: ["italic"],
   weight: ["400", "500"],
   display: "swap",
 })
@@ -40,8 +34,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f1ea" },
-    { media: "(prefers-color-scheme: dark)", color: "#141311" },
+    { media: "(prefers-color-scheme: light)", color: "#fafaf7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0f11" },
   ],
 }
 
@@ -50,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${fraunces.variable} ${sourceSans.variable} ${jetbrains.variable}`}
+      className={`${schibsted.variable} ${newsreader.variable}`}
     >
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
@@ -61,8 +55,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               unstyled: true,
               classNames: {
                 toast:
-                  "card flex items-center gap-3 px-4 py-3 text-sm font-sans w-[360px] max-w-[calc(100vw-32px)] shadow-card",
-                title: "font-semibold",
+                  "pop anim-rise flex items-center gap-3 px-4 py-3 text-sm font-sans w-[380px] max-w-[calc(100vw-32px)]",
+                title: "font-medium",
                 description: "text-ink-2",
                 actionButton: "btn btn-sm ml-auto",
                 cancelButton: "btn btn-sm btn-ghost",

@@ -1,10 +1,15 @@
 import Link from "next/link"
+import { Mark } from "@/components/mark"
 import { cn } from "@/lib/utils"
 
 export function Wordmark({ className, href = "/" }: { className?: string; href?: string }) {
   return (
-    <Link href={href} className={cn("font-display text-[19px] font-semibold tracking-tight text-ink", className)}>
-      Bookmark-AI
+    <Link
+      href={href}
+      aria-label="Bookmark-AI home"
+      className={cn("inline-flex items-baseline text-[19px] font-bold tracking-[-0.03em] text-ink", className)}
+    >
+      book<Mark>mark</Mark>
     </Link>
   )
 }
