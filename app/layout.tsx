@@ -46,7 +46,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
       className={`${schibsted.variable} ${newsreader.variable}`}
     >
-      <body>
+      {/* Extensions (ColorZilla, Grammarly) add attributes to body before React loads. */}
+      <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           {children}
           <Toaster
