@@ -9,13 +9,22 @@ export interface Prefs {
 }
 
 const KEY = "bookmark-ai:prefs"
-const DEFAULTS: Prefs = { layout: "grid", sort: "newest", demoBannerDismissed: false }
+const DEFAULTS: Prefs = { layout: "list", sort: "newest", demoBannerDismissed: false }
+
+/** The UI offers Newest and Oldest only; older saved prefs fall back to Newest. */
+function sanitize(p: Prefs): Prefs {
+  return {
+    layout: p.layout === "grid" ? "grid" : "list",
+    sort: p.sort === "oldest" ? "oldest" : "newest",
+    demoBannerDismissed: p.demoBannerDismissed === true,
+  }
+}
 
 export function readPrefs(): Prefs {
   if (typeof window === "undefined") return DEFAULTS
   try {
     const raw = window.localStorage.getItem(KEY)
-    return raw ? { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Prefs>) } : DEFAULTS
+    return raw ? sanitize({ ...DEFAULTS, ...(JSON.parse(raw) as Partial<Prefs>) }) : DEFAULTS
   } catch {
     return DEFAULTS
   }

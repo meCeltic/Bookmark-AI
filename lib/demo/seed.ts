@@ -10,7 +10,6 @@ export const DEMO_COLLECTIONS: Array<Pick<Collection, "name">> = [
   { name: "Engineering" },
   { name: "Design" },
   { name: "Tools" },
-  { name: "Reading list" },
 ]
 
 const daysAgo = (d: number, hour = 9) => {
@@ -237,7 +236,6 @@ export const DEMO_BOOKMARKS: Seed[] = [
     category: "article",
     faviconUrl: "https://paulgraham.com/favicon.ico",
     readingMinutes: 18,
-    collection: "Reading list",
     createdAt: daysAgo(1, 8),
   },
   {
@@ -249,7 +247,6 @@ export const DEMO_BOOKMARKS: Seed[] = [
     category: "article",
     faviconUrl: "https://jvns.ca/favicon.ico",
     readingMinutes: 9,
-    collection: "Reading list",
     createdAt: daysAgo(2, 7),
   },
   {
@@ -261,7 +258,6 @@ export const DEMO_BOOKMARKS: Seed[] = [
     category: "article",
     faviconUrl: "https://www.joelonsoftware.com/favicon.ico",
     readingMinutes: 8,
-    collection: "Reading list",
     createdAt: daysAgo(5, 23),
   },
   {
@@ -273,7 +269,6 @@ export const DEMO_BOOKMARKS: Seed[] = [
     category: "paper",
     faviconUrl: "https://arxiv.org/favicon.ico",
     readingMinutes: 45,
-    collection: "Reading list",
     createdAt: daysAgo(13),
   },
   {

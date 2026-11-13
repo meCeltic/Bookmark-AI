@@ -111,7 +111,8 @@ export type Enrichment = z.infer<typeof enrichmentSchema>
 export const SORT_ORDERS = ["newest", "oldest", "title", "domain", "opened"] as const
 export type SortOrder = (typeof SORT_ORDERS)[number]
 
-export const SYSTEM_VIEWS = ["all", "unsorted", "favourites", "reading", "archive"] as const
+/** "all" is the Inbox: everything not archived. Unread is a count, not a view. */
+export const SYSTEM_VIEWS = ["all", "favourites", "archive"] as const
 export type SystemView = (typeof SYSTEM_VIEWS)[number]
 
 /** Where the dashboard is looking: a built-in view, or one collection. */

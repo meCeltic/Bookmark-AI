@@ -30,18 +30,8 @@ describe("applyFilter views", () => {
       ["fav", "inCol", "plain", "read"],
     )
   })
-  it("unsorted = not archived and no collection", () => {
-    expect(ids(applyFilter(all, filterFor({ kind: "view", view: "unsorted" }))).sort()).toEqual(
-      ["fav", "plain", "read"],
-    )
-  })
   it("favourites = favourite and not archived", () => {
     expect(ids(applyFilter(all, filterFor({ kind: "view", view: "favourites" })))).toEqual(["fav"])
-  })
-  it("reading = unread and not archived", () => {
-    expect(ids(applyFilter(all, filterFor({ kind: "view", view: "reading" }))).sort()).toEqual(
-      ["fav", "inCol", "plain"],
-    )
   })
   it("archive = archived only", () => {
     expect(ids(applyFilter(all, filterFor({ kind: "view", view: "archive" }))).sort()).toEqual(
@@ -151,6 +141,6 @@ describe("counts", () => {
   })
 
   it("viewCounts applies the same view semantics", () => {
-    expect(viewCounts(list)).toEqual({ all: 3, unsorted: 0, favourites: 1, reading: 2, archive: 1 })
+    expect(viewCounts(list)).toEqual({ all: 3, favourites: 1, archive: 1, unread: 2, dead: 0 })
   })
 })

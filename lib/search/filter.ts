@@ -20,12 +20,8 @@ const matchesSystemView = (b: Bookmark, view: SystemView): boolean => {
   switch (view) {
     case "all":
       return !isArchived(b)
-    case "unsorted":
-      return !isArchived(b) && b.collectionId === null
     case "favourites":
       return !isArchived(b) && b.favourite
-    case "reading":
-      return !isArchived(b) && b.readAt === null
     case "archive":
       return isArchived(b)
   }
@@ -111,12 +107,17 @@ export const collectionCounts = (bookmarks: Bookmark[]): Map<string, number> => 
   return counts
 }
 
-export const viewCounts = (bookmarks: Bookmark[]): Record<SystemView, number> => {
-  const counts = { all: 0, unsorted: 0, favourites: 0, reading: 0, archive: 0 }
+export const isUnread = (b: Bookmark): boolean => !isArchived(b) && b.readAt === null
+
+/** Per-view totals, plus `unread` (the Inbox badge) and `dead` (live links that failed a check). */
+export const viewCounts = (bookmarks: Bookmark[]): Record<SystemView | "unread" | "dead", number> => {
+  const counts = { all: 0, favourites: 0, archive: 0, unread: 0, dead: 0 }
   for (const b of bookmarks) {
     for (const view of SYSTEM_VIEWS) {
       if (matchesSystemView(b, view)) counts[view] += 1
     }
+    if (isUnread(b)) counts.unread += 1
+    if (!isArchived(b) && b.health === "dead") counts.dead += 1
   }
   return counts
 }
