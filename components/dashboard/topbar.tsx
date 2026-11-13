@@ -152,7 +152,7 @@ export function TopBar({ onOpenMenu }: Props) {
       <button type="button" className="btn btn-ghost btn-icon lg:hidden" aria-label="Menu" onClick={onOpenMenu}>
         <Menu size={18} />
       </button>
-      <span className="min-w-0 sm:hidden"><Wordmark href={api.mode === "demo" ? "/" : "/dashboard"} /></span>
+      <span className="min-w-0 sm:hidden"><Wordmark /></span>
 
       {/* Phones: a bar fixed to the bottom, above the home indicator. Wider: inline in the header. */}
       <form
