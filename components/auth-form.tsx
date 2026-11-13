@@ -10,40 +10,58 @@ interface Props {
   linkError?: boolean
 }
 
+const linkClass = "text-ink underline decoration-line-strong underline-offset-4 hover:text-action hover:decoration-current"
+
 export function AuthForm({ mode, next, linkError }: Props) {
   const action = mode === "login" ? signInAction : signUpAction
   const [state, formAction, pending] = useActionState<AuthState, FormData>(action, {})
+  const login = mode === "login"
 
   return (
-    <form action={formAction} className="w-full max-w-[360px]">
-      <h1 className="font-display text-[30px] font-medium leading-tight">{mode === "login" ? "Sign in" : "Create your account"}</h1>
-      {linkError ? <p className="mt-3 text-[13.5px] text-danger">That link has expired. Sign in, or ask for a new one.</p> : null}
+    <form action={formAction} className="w-full">
+      <h1 className="text-[32px] leading-tight" style={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
+        {login ? "Welcome back" : "Create your account"}
+      </h1>
+      <p className="mt-2 text-[15px] text-ink-2">
+        {login ? "Sign in to your saved pages." : "Your saved pages, on every device."}
+      </p>
+      {linkError ? <p role="alert" className="mt-4 text-[14px] text-danger">That link has expired. Sign in, or ask for a new one.</p> : null}
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
-      <label className="mt-8 block">
-        <span className="meta">Email</span>
-        <input name="email" type="email" autoComplete="email" required className="rule-input mt-1 text-[15px]" placeholder="you@example.com" />
-      </label>
-      <label className="mt-5 block">
-        <span className="meta">Password</span>
-        <input name="password" type="password" autoComplete={mode === "login" ? "current-password" : "new-password"} required minLength={8} className="rule-input mt-1 text-[15px]" placeholder={mode === "signup" ? "at least 8 characters" : ""} />
-      </label>
+      <div className="mt-8 space-y-4">
+        <div>
+          <label htmlFor="auth-email" className="meta block">Email</label>
+          <input id="auth-email" name="email" type="email" autoComplete="email" required className="field mt-1.5 text-[15px]" placeholder="you@example.com" />
+        </div>
+        <div>
+          <label htmlFor="auth-password" className="meta block">Password</label>
+          <input
+            id="auth-password"
+            name="password"
+            type="password"
+            autoComplete={login ? "current-password" : "new-password"}
+            required
+            minLength={8}
+            className="field mt-1.5 text-[15px]"
+            placeholder={login ? "" : "At least 8 characters"}
+          />
+        </div>
+      </div>
 
-      {state.error ? <p className="mt-3 text-[13.5px] text-danger">{state.error}</p> : null}
-      {state.notice ? <p className="mt-3 text-[13.5px] text-ok">{state.notice}</p> : null}
+      {state.error ? <p role="alert" className="mt-4 text-[14px] text-danger">{state.error}</p> : null}
+      {state.notice ? <p role="status" className="mt-4 text-[14px] text-ok">{state.notice}</p> : null}
 
-      <button type="submit" disabled={pending} className="btn btn-primary mt-7 h-11 w-full text-[15px]">
-        {pending ? (mode === "login" ? "Signing in…" : "Creating…") : mode === "login" ? "Sign in" : "Create account"}
+      <button type="submit" disabled={pending} className="btn btn-primary mt-6 h-10 w-full text-[15px]">
+        {pending ? (login ? "Signing in…" : "Creating…") : login ? "Sign in" : "Create account"}
       </button>
 
-      <p className="mt-6 text-[13.5px] text-ink-2">
-        {mode === "login" ? (
-          <>New here? <Link href="/signup" className="underline underline-offset-2 hover:text-accent">Create an account</Link></>
+      <p className="mt-6 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-ink-2">
+        {login ? (
+          <span>New here? <Link href="/signup" className={linkClass}>Create an account</Link></span>
         ) : (
-          <>Already have one? <Link href="/login" className="underline underline-offset-2 hover:text-accent">Sign in</Link></>
+          <span>Already have one? <Link href="/login" className={linkClass}>Sign in</Link></span>
         )}
-        <span className="mx-2 text-ink-3">·</span>
-        <Link href="/demo" className="underline underline-offset-2 hover:text-accent">Just try the demo</Link>
+        <Link href="/demo" className={linkClass}>Try the demo</Link>
       </p>
     </form>
   )
