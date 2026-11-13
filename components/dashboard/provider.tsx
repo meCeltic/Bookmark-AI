@@ -25,11 +25,13 @@ import type { BookmarkRepository, RepositoryMode } from "@/lib/repo/types"
 import { materialize } from "@/lib/repo/shared"
 import { requestEnrichment, requestHealth } from "@/lib/client/enrich"
 import { readPrefs, writePrefs, type Layout } from "@/lib/client/prefs"
-import { applyFilter, tagCounts, viewCounts, collectionCounts } from "@/lib/search/filter"
+import { applyFilter, tagCounts, viewCounts, collectionCounts, isUnread, matchesView } from "@/lib/search/filter"
+import { withTransition } from "@/lib/client/transition"
 import { createSearchIndex, searchBookmarks, type SearchHit } from "@/lib/search/rank"
 import { normalizeUrl, canonicalKey, domainOf } from "@/lib/url/normalize"
 import type { ImportedBookmark } from "@/lib/import/netscape"
 import { dedupeImports } from "@/lib/import/netscape"
+import { undoToast } from "./undo-toast"
 
 /**
  * One state tree for the whole dashboard. Mutations are optimistic: the
@@ -48,6 +50,10 @@ interface State {
   sort: SortOrder
   layout: Layout
   healthFilter: "dead" | null
+  /** urlNormalized of cards saved moments ago; only these play the entrance animation. */
+  fresh: Set<string>
+  /** Bumped by changes the user caused (not hydration), so counters know when to roll. */
+  rev: number
 }
 
 type Action =
@@ -64,6 +70,8 @@ type Action =
   | { type: "sort"; sort: SortOrder }
   | { type: "layout"; layout: Layout }
   | { type: "healthFilter"; value: "dead" | null }
+  | { type: "swap"; from: string; bookmark: Bookmark }
+  | { type: "fresh"; key: string; on: boolean }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -73,6 +81,7 @@ function reducer(state: State, action: Action): State {
       const exists = state.bookmarks.some((b) => b.id === action.bookmark.id)
       return {
         ...state,
+        rev: state.rev + 1,
         bookmarks: exists
           ? state.bookmarks.map((b) => (b.id === action.bookmark.id ? action.bookmark : b))
           : [action.bookmark, ...state.bookmarks],
@@ -82,12 +91,12 @@ function reducer(state: State, action: Action): State {
       const byId = new Map(action.bookmarks.map((b) => [b.id, b]))
       const merged = state.bookmarks.map((b) => byId.get(b.id) ?? b)
       const fresh = action.bookmarks.filter((b) => !state.bookmarks.some((x) => x.id === b.id))
-      return { ...state, bookmarks: [...fresh, ...merged] }
+      return { ...state, rev: state.rev + 1, bookmarks: [...fresh, ...merged] }
     }
     case "remove": {
       const ids = new Set(action.ids)
       const selected = new Set([...state.selected].filter((id) => !ids.has(id)))
-      return { ...state, bookmarks: state.bookmarks.filter((b) => !ids.has(b.id)), selected }
+      return { ...state, rev: state.rev + 1, bookmarks: state.bookmarks.filter((b) => !ids.has(b.id)), selected }
     }
     case "pending": {
       const pending = new Set(state.pending)
@@ -118,6 +127,22 @@ function reducer(state: State, action: Action): State {
       return { ...state, layout: action.layout }
     case "healthFilter":
       return { ...state, healthFilter: action.value }
+    case "swap": {
+      // Replace the optimistic card in place, so it keeps its slot and its reading state.
+      const pending = new Set(state.pending)
+      if (pending.delete(action.from)) pending.add(action.bookmark.id)
+      return {
+        ...state,
+        pending,
+        bookmarks: state.bookmarks.map((b) => (b.id === action.from ? action.bookmark : b)),
+      }
+    }
+    case "fresh": {
+      const fresh = new Set(state.fresh)
+      if (action.on) fresh.add(action.key)
+      else fresh.delete(action.key)
+      return { ...state, fresh }
+    }
   }
 }
 
@@ -134,7 +159,15 @@ export interface DashboardApi {
   addBookmark: (raw: string, opts?: { collectionId?: string | null }) => Promise<Bookmark | null>
   reEnrich: (id: string) => Promise<void>
   patch: (id: string, patch: BookmarkPatch, opts?: { silent?: boolean }) => Promise<void>
-  patchMany: (ids: string[], patch: BookmarkPatch, label: string) => Promise<void>
+  /** Apply one patch to many cards with an undo toast. `move` runs it as a view transition (cards leave the view). */
+  patchMany: (ids: string[], patch: BookmarkPatch, label: string, opts?: { move?: boolean }) => Promise<void>
+  /** Mark read and archive in one step. */
+  done: (ids: string[]) => Promise<void>
+  /** Archive, or restore when already archived. */
+  toggleArchive: (bookmark: Bookmark) => Promise<void>
+  /** Open a random unread card, weighted towards the oldest. */
+  readSomething: () => void
+  setLayout: (layout: Layout) => void
   remove: (ids: string[]) => Promise<void>
   open: (bookmark: Bookmark) => void
   addTag: (id: string, tag: string) => Promise<void>
@@ -151,8 +184,8 @@ export interface DashboardApi {
   /** How many cards are still waiting to be read. */
   pendingCount: number
   checkHealth: (ids?: string[]) => Promise<void>
-  /** Scroll to a card and give it keyboard focus. */
-  reveal: (id: string) => void
+  /** Scroll to a card and give it keyboard focus; `flash` marks it briefly. */
+  reveal: (id: string, opts?: { flash?: boolean }) => void
   resetDemo: () => Promise<void>
   reload: () => Promise<void>
 }
@@ -184,18 +217,22 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     tags: [],
     query: "",
     sort: "newest" as SortOrder,
-    layout: "grid" as Layout,
+    layout: "list" as Layout,
     healthFilter: null,
+    fresh: new Set<string>(),
+    rev: 0,
   }))
   const [hydrated, setHydrated] = useState(mode === "cloud")
   const enrichAborts = useRef(new Map<string, AbortController>())
   // Always the latest bookmarks, for callbacks that resolve after a state change.
   const latest = useRef(state.bookmarks)
   const latestCollections = useRef(state.collections)
+  const latestView = useRef(state.view)
   useEffect(() => {
     latest.current = state.bookmarks
     latestCollections.current = state.collections
-  }, [state.bookmarks, state.collections])
+    latestView.current = state.view
+  }, [state.bookmarks, state.collections, state.view])
 
   const reload = useCallback(async () => {
     const [bookmarks, collections] = await Promise.all([repo.listBookmarks(), repo.listCollections()])
@@ -315,11 +352,16 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
 
   // ---- public api ---------------------------------------------------------
 
-  const reveal = useCallback<DashboardApi["reveal"]>((id) => {
+  const reveal = useCallback<DashboardApi["reveal"]>((id, opts) => {
     dispatch({ type: "query", query: "" })
     dispatch({ type: "tags", tags: [] })
     dispatch({ type: "healthFilter", value: null })
-    window.dispatchEvent(new CustomEvent("bookmark-ai:reveal", { detail: id }))
+    // The card may live in another view (archived, or another collection).
+    const card = latest.current.find((b) => b.id === id)
+    if (card && !matchesView(card, latestView.current)) {
+      dispatch({ type: "view", view: { kind: "view", view: card.archivedAt ? "archive" : "all" } })
+    }
+    window.dispatchEvent(new CustomEvent("bookmark-ai:reveal", { detail: { id, flash: opts?.flash ?? false } }))
   }, [])
 
   const readingRef = useRef(false)
@@ -370,10 +412,9 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       const key = canonicalKey(url)
       const existing = latest.current.find((b) => b.urlNormalized === key)
       if (existing) {
-        toast("Already in your drawer", {
-          description: `Saved ${new Date(existing.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}.`,
-          action: { label: "Show", onClick: () => reveal(existing.id) },
-        })
+        // Not an error: take them to the card they already have.
+        reveal(existing.id, { flash: true })
+        toast(`Already saved on ${new Date(existing.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`)
         return existing
       }
 
@@ -387,20 +428,27 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
               : null,
       }
       const optimistic = materialize(input)
-      dispatch({ type: "upsert", bookmark: optimistic })
-      dispatch({ type: "pending", id: optimistic.id, on: true })
+      dispatch({ type: "fresh", key: optimistic.urlNormalized, on: true })
+      const inserted = withTransition(() => {
+        dispatch({ type: "upsert", bookmark: optimistic })
+        dispatch({ type: "pending", id: optimistic.id, on: true })
+      })
+      window.setTimeout(() => dispatch({ type: "fresh", key: optimistic.urlNormalized, on: false }), 1200)
 
       const result = await repo.createBookmark(input)
+      // The insert runs a frame late inside the transition; never swap before it lands.
+      await inserted
       if (!result.ok) {
-        dispatch({ type: "remove", ids: [optimistic.id] })
-        dispatch({ type: "pending", id: optimistic.id, on: false })
+        withTransition(() => {
+          dispatch({ type: "remove", ids: [optimistic.id] })
+          dispatch({ type: "pending", id: optimistic.id, on: false })
+        })
         toast.error(result.error.message)
         return null
       }
       // Swap the optimistic id for the real one before enrichment lands.
-      dispatch({ type: "remove", ids: [optimistic.id] })
-      dispatch({ type: "pending", id: optimistic.id, on: false })
-      dispatch({ type: "upsert", bookmark: result.data })
+      dispatch({ type: "swap", from: optimistic.id, bookmark: result.data })
+      window.dispatchEvent(new CustomEvent("bookmark-ai:saved", { detail: result.data.id }))
       void enrich(result.data)
       return result.data
     },
@@ -426,64 +474,76 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   )
 
   const patchMany = useCallback<DashboardApi["patchMany"]>(
-    async (ids, p, label) => {
+    async (ids, p, label, opts) => {
       const targets = state.bookmarks.filter((b) => ids.includes(b.id))
       if (!targets.length) return
       const stamp = new Date().toISOString()
-      dispatch({ type: "upsertMany", bookmarks: targets.map((b) => ({ ...b, ...p, updatedAt: stamp })) })
-      dispatch({ type: "select", ids: [], mode: "set" })
+      const run = opts?.move ? withTransition : async (fn: () => void) => fn()
+      const applied = run(() => {
+        dispatch({ type: "upsertMany", bookmarks: targets.map((b) => ({ ...b, ...p, updatedAt: stamp })) })
+        dispatch({ type: "select", ids: [], mode: "set" })
+      })
       const result = await repo.updateBookmarks(targets.map((b) => b.id), p)
+      await applied
       if (!result.ok) {
-        dispatch({ type: "upsertMany", bookmarks: targets })
-        toast.error(`Could not ${label} those cards.`)
+        run(() => dispatch({ type: "upsertMany", bookmarks: targets }))
+        toast.error("Could not update those cards. Nothing changed.")
         return
       }
       dispatch({ type: "upsertMany", bookmarks: result.data })
-      toast(`${label.charAt(0).toUpperCase() + label.slice(1)} ${targets.length} ${targets.length === 1 ? "card" : "cards"}`, {
-        action: {
-          label: "Undo",
-          onClick: async () => {
-            dispatch({ type: "upsertMany", bookmarks: targets })
-            // The original values may differ per card, so undo is per card.
-            await Promise.all(targets.map((b) => repo.updateBookmark(b.id, revertPatch(b, p))))
-          },
-        },
+      const what = targets.length === 1 ? `\u201c${targets[0]!.title}\u201d` : `${targets.length} cards`
+      undoToast(`${label.charAt(0).toUpperCase() + label.slice(1)} ${what}`, async () => {
+        run(() => dispatch({ type: "upsertMany", bookmarks: targets }))
+        // The original values may differ per card, so undo is per card.
+        await Promise.all(targets.map((b) => repo.updateBookmark(b.id, revertPatch(b, p))))
       })
     },
     [repo, state.bookmarks],
   )
+
+  const done = useCallback<DashboardApi["done"]>(
+    async (ids) => {
+      const stamp = new Date().toISOString()
+      const one = ids.length === 1 ? state.bookmarks.find((b) => b.id === ids[0]) : undefined
+      await patchMany(ids, { readAt: one?.readAt ?? stamp, archivedAt: stamp }, "finished", { move: true })
+    },
+    [patchMany, state.bookmarks],
+  )
+
+  const toggleArchive = useCallback<DashboardApi["toggleArchive"]>(
+    async (b) => {
+      await patchMany([b.id], { archivedAt: b.archivedAt ? null : new Date().toISOString() }, b.archivedAt ? "restored" : "archived", { move: true })
+    },
+    [patchMany],
+  )
+
+  const setLayout = useCallback<DashboardApi["setLayout"]>((layout) => {
+    withTransition(() => dispatch({ type: "layout", layout }))
+  }, [])
 
   const remove = useCallback<DashboardApi["remove"]>(
     async (ids) => {
       const targets = state.bookmarks.filter((b) => ids.includes(b.id))
       if (!targets.length) return
       for (const b of targets) enrichAborts.current.get(b.id)?.abort()
-      dispatch({ type: "remove", ids })
+      const removed = withTransition(() => dispatch({ type: "remove", ids }))
       const result = await repo.deleteBookmarks(targets.map((b) => b.id))
+      await removed
       if (!result.ok) {
-        dispatch({ type: "upsertMany", bookmarks: targets })
+        withTransition(() => dispatch({ type: "upsertMany", bookmarks: targets }))
         toast.error("Could not delete. Nothing was removed.")
         return
       }
-      let undone = false
-      toast(targets.length === 1 ? `Removed "${targets[0]?.title}"` : `Removed ${targets.length} cards`, {
-        duration: 6000,
-        action: {
-          label: "Undo",
-          onClick: async () => {
-            if (undone) return
-            undone = true
-            const res = await repo.importBookmarks(targets.map(toNewBookmark))
-            if (res.ok) {
-              const byKey = new Map(targets.map((b) => [b.urlNormalized, b]))
-              const restored = res.data.created.map((b) => {
-                const was = byKey.get(b.urlNormalized)
-                return { ...b, health: was?.health ?? "unknown", lastOpenedAt: was?.lastOpenedAt ?? null }
-              })
-              dispatch({ type: "upsertMany", bookmarks: restored })
-            } else toast.error("Could not restore.")
-          },
-        },
+      undoToast(targets.length === 1 ? `Removed \u201c${targets[0]?.title}\u201d` : `Removed ${targets.length} cards`, async () => {
+        const res = await repo.importBookmarks(targets.map(toNewBookmark))
+        if (res.ok) {
+          const byKey = new Map(targets.map((b) => [b.urlNormalized, b]))
+          const restored = res.data.created.map((b) => {
+            const was = byKey.get(b.urlNormalized)
+            return { ...b, health: was?.health ?? "unknown", lastOpenedAt: was?.lastOpenedAt ?? null }
+          })
+          withTransition(() => dispatch({ type: "upsertMany", bookmarks: restored }))
+        } else toast.error("Could not restore.")
       })
     },
     [repo, state.bookmarks],
@@ -497,6 +557,17 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     },
     [patch],
   )
+
+  const readSomething = useCallback<DashboardApi["readSomething"]>(() => {
+    const unread = state.bookmarks.filter(isUnread).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    if (!unread.length) {
+      toast("Nothing unread. Inbox zero.")
+      return
+    }
+    const pick = pickWeighted(unread, Math.random())
+    toast(`Opened \u201c${pick.title}\u201d`)
+    open(pick)
+  }, [state.bookmarks, open])
 
   const addTag = useCallback<DashboardApi["addTag"]>(
     async (id, tag) => {
@@ -543,16 +614,10 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       if (state.tags.includes(from)) {
         dispatch({ type: "tags", tags: state.tags.map((t) => (t === from ? target : t)).filter(Boolean) })
       }
-      toast(target ? `Renamed "${from}" to "${target}" on ${result.data.affected} cards` : `Removed "${from}" from ${result.data.affected} cards`, {
-        duration: 6000,
-        action: {
-          label: "Undo",
-          onClick: async () => {
-            // Restore each card's exact tag list; a merge cannot be undone by renaming back.
-            await Promise.all(before.map((b) => repo.updateBookmark(b.id, { tags: b.tags })))
-            await reload()
-          },
-        },
+      undoToast(target ? `Renamed #${from} to #${target} on ${result.data.affected} cards` : `Removed #${from} from ${result.data.affected} cards`, async () => {
+        // Restore each card's exact tag list; a merge cannot be undone by renaming back.
+        await Promise.all(before.map((b) => repo.updateBookmark(b.id, { tags: b.tags })))
+        await reload()
       })
     },
     [repo, reload, state.tags],
@@ -595,23 +660,17 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       dispatch({ type: "collections", collections: state.collections.filter((c) => c.id !== id) })
       dispatch({ type: "upsertMany", bookmarks: members.map((b) => ({ ...b, collectionId: null })) })
       if (state.view.kind === "collection" && state.view.id === id) dispatch({ type: "view", view: { kind: "view", view: "all" } })
-      toast(`Removed "${collection.name}". Its ${members.length} cards are now unsorted.`, {
-        duration: 6000,
-        action: {
-          label: "Undo",
-          onClick: async () => {
-            const again = await repo.createCollection(collection.name)
-            if (!again.ok) {
-              toast.error("Could not restore the collection.")
-              return
-            }
-            dispatch({ type: "collections", collections: [...latestCollections.current, again.data] })
-            if (members.length) {
-              const moved = await repo.updateBookmarks(members.map((b) => b.id), { collectionId: again.data.id })
-              if (moved.ok) dispatch({ type: "upsertMany", bookmarks: moved.data })
-            }
-          },
-        },
+      undoToast(`Removed \u201c${collection.name}\u201d. Its ${members.length} cards stay in your Inbox.`, async () => {
+        const again = await repo.createCollection(collection.name)
+        if (!again.ok) {
+          toast.error("Could not restore the collection.")
+          return
+        }
+        dispatch({ type: "collections", collections: [...latestCollections.current, again.data] })
+        if (members.length) {
+          const moved = await repo.updateBookmarks(members.map((b) => b.id), { collectionId: again.data.id })
+          if (moved.ok) dispatch({ type: "upsertMany", bookmarks: moved.data })
+        }
       })
     },
     [repo, state.collections, state.bookmarks, state.view],
@@ -727,6 +786,10 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       reEnrich,
       patch,
       patchMany,
+      done,
+      toggleArchive,
+      readSomething,
+      setLayout,
       remove,
       open,
       addTag,
@@ -744,7 +807,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       reload,
     }),
     [
-      mode, state, visible, hits, counts, addBookmark, reEnrich, patch, patchMany, remove, open, addTag, removeTag,
+      mode, state, visible, hits, counts, addBookmark, reEnrich, patch, patchMany, done, toggleArchive, readSomething, setLayout, remove, open, addTag, removeTag,
       renameTag, createCollection, renameCollection, deleteCollection, importItems, readPending, checkHealth, reveal, resetDemo, reload,
     ],
   )
@@ -774,6 +837,21 @@ function toNewBookmark(b: Bookmark): NewBookmark {
     readingMinutes: b.readingMinutes,
     createdAt: b.createdAt,
   }
+}
+
+/**
+ * Pick from a list sorted oldest first, weighted linearly towards the start:
+ * the oldest card is n times as likely as the newest. `r` is in [0, 1).
+ */
+export function pickWeighted<T>(sortedOldestFirst: T[], r: number): T {
+  const n = sortedOldestFirst.length
+  const total = (n * (n + 1)) / 2
+  let target = r * total
+  for (let i = 0; i < n; i++) {
+    target -= n - i
+    if (target < 0) return sortedOldestFirst[i]!
+  }
+  return sortedOldestFirst[n - 1]!
 }
 
 /** Build the patch that undoes `applied` on `original`. */
