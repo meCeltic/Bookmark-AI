@@ -1,7 +1,7 @@
 "use client"
 
-import { Archive, ArchiveRestore, BookOpen, Check, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
-import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react"
+import { Archive, ArchiveRestore, BookOpen, Check, CheckCheck, Copy, ExternalLink, FolderInput, MoreHorizontal, RefreshCw, Star, Tag, Trash2 } from "lucide-react"
+import { useEffect, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react"
 import { toast } from "sonner"
 import type { Bookmark } from "@/lib/domain/bookmark"
 import { domainOf } from "@/lib/url/normalize"
@@ -11,14 +11,13 @@ import { MenuContent, MenuItem, MenuRoot, MenuSeparator, MenuSub, MenuTrigger } 
 import { useDashboard } from "./provider"
 import { highlightRanges } from "@/lib/search/rank"
 
-function markRanges(text: string, ranges: [number, number][]) {
-  return highlightRanges(text, ranges).map((seg, i) =>
-    seg.hit ? <mark key={i} className="rounded-[1px] bg-accent-soft text-ink">{seg.text}</mark> : <span key={i}>{seg.text}</span>,
-  )
+/** Search hits are wrapped in native <mark>; globals.css paints it as the highlighter. */
+function markRanges(text: string, ranges: [number, number][]): ReactNode {
+  return highlightRanges(text, ranges).map((seg, i) => (seg.hit ? <mark key={i}>{seg.text}</mark> : <span key={i}>{seg.text}</span>))
 }
 
-/** Wrap the query words found in a title with <mark>. */
-function highlight(text: string, query: string) {
+/** Wrap the query words found in `text` with <mark>. */
+function highlight(text: string, query: string): ReactNode {
   const words = query.trim().toLowerCase().split(/\s+/).filter((w) => w.length >= 2)
   if (!words.length) return text
   const lower = text.toLowerCase()
@@ -37,18 +36,27 @@ function highlight(text: string, query: string) {
 interface Props {
   bookmark: Bookmark
   layout: "grid" | "list"
-  index: number
   focused: boolean
   pending: boolean
   selected: boolean
+  /** Saved moments ago: plays the entrance once. */
+  fresh?: boolean
+  /** Briefly marked after a duplicate save or a reveal. */
+  flash?: boolean
+  /** View transition name, only for the first few dozen visible cards. */
+  transitionName?: string
   onFocus: () => void
   /** Inclusive index pairs in the title that matched the search, if any. */
   titleRanges?: [number, number][]
 }
 
-export function IndexCard({ bookmark, layout, index, focused, pending, selected, onFocus, titleRanges }: Props) {
+export function IndexCard({ bookmark, layout, focused, pending, selected, fresh, flash, transitionName, onFocus, titleRanges }: Props) {
   const api = useDashboard()
   const [tagDraft, setTagDraft] = useState<string | null>(null)
+  const [starPops, setStarPops] = useState(0)
+  // What the card looked like when it mounted: a summary or tags that arrive later get the reveal.
+  const [hadSummary] = useState(Boolean(bookmark.summary))
+  const [hadTags] = useState(bookmark.tags.length > 0)
   const { state } = api
   const selecting = state.selected.size > 0
 
@@ -88,18 +96,22 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
     toast("Link copied")
   }
 
+  const toggleStar = () => {
+    setStarPops((n) => n + 1)
+    void api.patch(bookmark.id, { favourite: !bookmark.favourite })
+  }
+
   const domain = domainOf(bookmark.url)
   const unread = bookmark.readAt === null && !bookmark.archivedAt
-  const aiLabel =
-    bookmark.enrichment === "done" ? "AI summary" : bookmark.enrichment === "fallback" ? "From page metadata" : bookmark.enrichment === "failed" ? "Could not read this page" : pending ? "Reading page…" : "Not read yet"
-  const statusText =
-    bookmark.enrichment === "done" ? "ai summary" : bookmark.enrichment === "fallback" ? "page meta" : bookmark.enrichment === "failed" ? "couldn't read" : pending ? "reading" : "not read yet"
+  const archived = Boolean(bookmark.archivedAt)
   const title = titleRanges ? markRanges(bookmark.title, titleRanges) : highlight(bookmark.title, state.query)
+  const summary = bookmark.summary ? highlight(bookmark.summary, state.query) : null
+  const age = formatDate(bookmark.createdAt)
 
   const menu = (
     <MenuRoot>
       <MenuTrigger asChild>
-        <button type="button" className="btn btn-ghost btn-icon h-7 w-7" aria-label="More" onClick={(e) => e.stopPropagation()}>
+        <button type="button" className="btn btn-ghost btn-icon h-7 w-7" aria-label="More" title="More" onClick={(e) => e.stopPropagation()}>
           <MoreHorizontal size={15} />
         </button>
       </MenuTrigger>
@@ -108,16 +120,13 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
         <MenuItem onSelect={copy}><Copy size={14} /> Copy link<span className="kbd ml-auto">c</span></MenuItem>
         <MenuItem onSelect={() => toggleSelect()}><Check size={14} /> {selected ? "Deselect" : "Select"}<span className="kbd ml-auto">x</span></MenuItem>
         <MenuSeparator />
-        <MenuItem onSelect={() => api.patch(bookmark.id, { favourite: !bookmark.favourite })}>
-          <Star size={14} /> {bookmark.favourite ? "Unfavourite" : "Favourite"}<span className="kbd ml-auto">f</span>
-        </MenuItem>
         <MenuItem onSelect={() => api.patch(bookmark.id, { readAt: unread ? new Date().toISOString() : null })}>
           <BookOpen size={14} /> {unread ? "Mark as read" : "Mark unread"}<span className="kbd ml-auto">r</span>
         </MenuItem>
         <MenuItem onSelect={() => setTagDraft("")}><Tag size={14} /> Add tag<span className="kbd ml-auto">t</span></MenuItem>
         <MenuSub label={<><FolderInput size={14} /> Move to</>}>
           <MenuItem onSelect={() => api.patch(bookmark.id, { collectionId: null })}>
-            {bookmark.collectionId === null ? <Check size={14} /> : <span className="w-[14px]" />} Unsorted
+            {bookmark.collectionId === null ? <Check size={14} /> : <span className="w-[14px]" />} No collection
           </MenuItem>
           {state.collections.map((c) => (
             <MenuItem key={c.id} onSelect={() => api.patch(bookmark.id, { collectionId: c.id })}>
@@ -127,28 +136,72 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
         </MenuSub>
         <MenuSeparator />
         <MenuItem onSelect={() => api.reEnrich(bookmark.id)} disabled={pending}><RefreshCw size={14} /> Read page again</MenuItem>
-        <MenuItem onSelect={() => api.patchMany([bookmark.id], { archivedAt: bookmark.archivedAt ? null : new Date().toISOString() }, bookmark.archivedAt ? "restored" : "archived")}>
-          {bookmark.archivedAt ? <ArchiveRestore size={14} /> : <Archive size={14} />} {bookmark.archivedAt ? "Restore" : "Archive"}<span className="kbd ml-auto">e</span>
+        <MenuItem onSelect={() => api.toggleArchive(bookmark)}>
+          {archived ? <ArchiveRestore size={14} /> : <Archive size={14} />} {archived ? "Restore" : "Archive"}<span className="kbd ml-auto">e</span>
         </MenuItem>
         <MenuItem danger onSelect={() => api.remove([bookmark.id])}><Trash2 size={14} /> Delete<span className="kbd ml-auto">⌫</span></MenuItem>
       </MenuContent>
     </MenuRoot>
   )
 
+  const starButton = (
+    <button
+      type="button"
+      className="btn btn-ghost btn-icon h-7 w-7"
+      title={bookmark.favourite ? "Unstar" : "Star"}
+      aria-label={bookmark.favourite ? "Unstar" : "Star"}
+      aria-pressed={bookmark.favourite}
+      onClick={(e) => { e.stopPropagation(); toggleStar() }}
+    >
+      <Star key={starPops} size={14} className={cn(starPops > 0 && "anim-star", bookmark.favourite && "fill-mark text-ink")} />
+    </button>
+  )
+  const doneButton = archived ? (
+    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Restore to Inbox" aria-label="Restore" onClick={(e) => { e.stopPropagation(); void api.toggleArchive(bookmark) }}>
+      <ArchiveRestore size={14} />
+    </button>
+  ) : (
+    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Done: mark read and archive (d)" aria-label="Done" onClick={(e) => { e.stopPropagation(); void api.done([bookmark.id]) }}>
+      <CheckCheck size={14} />
+    </button>
+  )
+  const copyButton = (
+    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Copy link" aria-label="Copy link" onClick={(e) => { e.stopPropagation(); void copy() }}>
+      <Copy size={14} />
+    </button>
+  )
+
+  const tagInput =
+    tagDraft !== null ? (
+      <input
+        autoFocus
+        className="h-6 w-28 min-w-0 rounded-[4px] bg-surface-2 px-1.5 text-[13px] outline-none focus:shadow-[0_0_0_2px_var(--action)]"
+        placeholder="tag, enter"
+        aria-label="New tag"
+        maxLength={32}
+        value={tagDraft}
+        onChange={(e) => setTagDraft(e.target.value)}
+        onKeyDown={submitTag}
+        onBlur={() => setTagDraft(null)}
+        onClick={(e) => e.stopPropagation()}
+      />
+    ) : null
+
+  const toggleTag = (tag: string) => {
+    const next = state.tags.includes(tag) ? state.tags.filter((t) => t !== tag) : [...state.tags, tag]
+    api.dispatch({ type: "tags", tags: next })
+  }
+
   const tags = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {bookmark.tags.map((tag) => (
-        <span key={tag} className="stamp-group anim-stamp">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      {bookmark.tags.map((tag, i) => (
+        <span key={tag} className={cn("stamp-group", !hadTags && "anim-stamp")} style={{ "--i": i } as CSSProperties}>
           <button
             type="button"
-            className="stamp"
+            className="tag"
             data-active={state.tags.includes(tag)}
-            title={state.tags.includes(tag) ? `Stop filtering by ${tag}` : `Filter by ${tag}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              const next = state.tags.includes(tag) ? state.tags.filter((t) => t !== tag) : [...state.tags, tag]
-              api.dispatch({ type: "tags", tags: next })
-            }}
+            title={state.tags.includes(tag) ? `Stop filtering by #${tag}` : `Filter by #${tag}`}
+            onClick={(e) => { e.stopPropagation(); toggleTag(tag) }}
           >
             {tag}
           </button>
@@ -157,31 +210,13 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
             aria-label={`Remove tag ${tag}`}
             title="Remove tag"
             className="stamp-x"
-            onClick={(e) => {
-              e.stopPropagation()
-              void api.removeTag(bookmark.id, tag)
-            }}
+            onClick={(e) => { e.stopPropagation(); void api.removeTag(bookmark.id, tag) }}
           >
             ×
           </button>
         </span>
       ))}
-      {tagDraft !== null ? (
-        <input
-          autoFocus
-          className="h-5 w-24 border-b border-accent bg-transparent font-mono text-[10.5px] outline-none"
-          placeholder="tag, enter"
-          maxLength={32}
-          value={tagDraft}
-          onChange={(e) => setTagDraft(e.target.value)}
-          onKeyDown={submitTag}
-          onBlur={() => setTagDraft(null)}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : null}
-      {pending && bookmark.tags.length === 0 ? (
-        <span className="font-mono text-[10.5px] text-ink-3 caret">stamping tags</span>
-      ) : null}
+      {tagInput}
     </div>
   )
 
@@ -196,8 +231,8 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
         aria-label={selected ? "Deselect" : "Select"}
         onClick={toggleSelect}
         className={cn(
-          "select-check hover-reveal inline-flex items-center justify-center rounded-[2px] border transition-colors",
-          selected ? "border-accent bg-accent text-accent-ink" : "border-border-strong bg-surface",
+          "select-check hover-reveal inline-flex items-center justify-center rounded-[3px] border transition-colors",
+          selected ? "border-action bg-action text-action-ink" : "border-line-strong bg-surface",
           selecting && "opacity-100",
         )}
       >
@@ -206,32 +241,71 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
     </span>
   )
 
+  const health =
+    bookmark.health === "dead" ? <span className="anim-stamp shrink-0 text-[12px] font-medium text-danger">Dead link</span>
+    : bookmark.health === "redirected" ? <span className="shrink-0 text-[12px] text-ink-3">Moved</span>
+    : null
+
+  const common = {
+    "data-id": bookmark.id,
+    "data-selected": selected,
+    "data-focused": focused,
+    "data-editing": tagDraft !== null,
+    onClick: openCard,
+    onMouseEnter: onFocus,
+    style: transitionName ? ({ viewTransitionName: transitionName } as CSSProperties) : undefined,
+  }
+  const flashClass = flash && "anim-fade shadow-[0_0_0_2px_var(--mark)]"
+
   // ---------------------------------------------------------------- list ----
   if (layout === "list") {
     return (
       <li
-        data-id={bookmark.id}
-        data-selected={selected}
-        data-focused={focused}
-        data-editing={tagDraft !== null}
-        onClick={openCard}
-        onMouseEnter={onFocus}
+        {...common}
         className={cn(
-          "group flex min-h-[44px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 transition-colors hover:bg-surface",
-          focused && "bg-surface ring-1 ring-inset ring-border-strong",
-          selected && "bg-accent-soft/40",
+          "row group relative min-w-0 cursor-pointer gap-3 px-2 sm:px-3",
+          "grid-cols-[16px_minmax(0,1fr)_auto_28px] md:grid-cols-[16px_minmax(0,1fr)_minmax(0,9rem)_minmax(0,12rem)_3.5rem_28px]",
+          pending && "reading",
+          fresh && "anim-enter",
+          flashClass,
         )}
       >
+        {bookmark.favourite ? <span aria-hidden className="fold" style={{ borderTopWidth: 12, borderLeftWidth: 12, borderTopRightRadius: 5 }} /> : null}
         {selectSlot}
-        <div className="flex min-w-0 flex-1 items-baseline gap-3">
-          <a href={bookmark.url} onClick={(e) => e.preventDefault()} tabIndex={0} onFocus={onFocus} className={cn("truncate font-display text-[15px] font-medium outline-none", unread && "font-semibold")}>{title}</a>
-          <span className="hidden truncate font-mono text-[11px] text-ink-3 sm:inline">{domain}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          {/* A real link, so Tab reaches every row and the URL shows in the status bar; the click is handled by the row. */}
+          <a
+            href={bookmark.url}
+            onClick={(e) => e.preventDefault()}
+            onFocus={onFocus}
+            className={cn("min-w-0 truncate text-[15px] text-ink outline-none", unread ? "font-bold" : "font-medium", pending && !bookmark.summary && "text-ink-2")}
+          >
+            {title}
+          </a>
+          {health}
+          {tagInput}
         </div>
-        <div className="hidden items-center gap-1.5 md:flex">{bookmark.tags.slice(0, 3).map((t) => <span key={t} className="stamp stamp-quiet pointer-events-none h-[18px]">{t}</span>)}</div>
-        {bookmark.favourite ? <Star size={13} className="fill-accent text-accent" /> : null}
-        {bookmark.health === "dead" ? <span className="font-mono text-[10px] uppercase text-danger">dead</span> : null}
-        <span className="w-14 text-right font-mono text-[11px] text-ink-3">{formatDate(bookmark.createdAt)}</span>
-        <div onClick={(e) => e.stopPropagation()}>{menu}</div>
+        <span className="hidden min-w-0 items-center gap-1.5 text-[13px] text-ink-3 md:flex">
+          {unread ? <span aria-label="Unread" className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" /> : null}
+          <span className="truncate">{domain}</span>
+        </span>
+        {/* Tags that do not fit wrap onto a hidden second line, so none is cut mid-word. */}
+        <span className="hidden h-5 min-w-0 flex-wrap items-center gap-x-2 overflow-hidden md:flex">
+          {bookmark.tags.slice(0, 3).map((t) => (
+            <button key={t} type="button" className="tag shrink-0" data-active={state.tags.includes(t)} onClick={(e) => { e.stopPropagation(); toggleTag(t) }}>{t}</button>
+          ))}
+        </span>
+        <span className="text-right text-[12px] text-ink-3 tabular-nums">{age}</span>
+        <div onClick={(e) => e.stopPropagation()} className="hover-reveal touch-show flex justify-end">{menu}</div>
+        {/* Hover actions float over the tags and age on wide screens; touch uses the ⋯ menu. */}
+        <span className="card-actions pointer-events-none absolute inset-y-0 right-[40px] hidden items-center [@media(hover:hover)]:md:flex" data-focused={focused}>
+          <span className="card-buttons pointer-events-auto flex items-center gap-0.5 rounded-[6px] bg-surface-2 pl-2">
+            {bookmark.readingMinutes ? <span className="mr-1 text-[12px] text-ink-3">{bookmark.readingMinutes} min read</span> : null}
+            {starButton}
+            {doneButton}
+            {copyButton}
+          </span>
+        </span>
       </li>
     )
   }
@@ -239,66 +313,45 @@ export function IndexCard({ bookmark, layout, index, focused, pending, selected,
   // ---------------------------------------------------------------- grid ----
   return (
     <li
-      data-id={bookmark.id}
-      data-selected={selected}
-      data-focused={focused}
-      data-editing={tagDraft !== null}
-      style={{ "--i": Math.min(index, 8) } as React.CSSProperties}
-      onClick={openCard}
-      onMouseEnter={onFocus}
+      {...common}
       className={cn(
-        "card anim-enter group relative flex cursor-pointer flex-col p-4 outline-none",
-        focused && "border-border-strong shadow-card",
-        pending && "border-dashed",
+        "card group relative flex min-w-0 cursor-pointer flex-col p-4 outline-none",
+        pending && "reading",
+        fresh && "anim-enter",
+        flashClass,
       )}
     >
-      {bookmark.imageUrl && !pending ? (
-        <div className="-mx-4 -mt-4 mb-3 aspect-[3/2] overflow-hidden border-b border-border bg-surface-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={bookmark.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" onError={(e) => (e.currentTarget.parentElement!.style.display = "none")} />
-        </div>
-      ) : null}
+      {bookmark.favourite ? <span aria-hidden className="fold" /> : null}
 
-      <header className="mb-2 flex items-center gap-2">
+      <header className="flex min-w-0 items-center gap-2 text-[13px] text-ink-3">
         {selectSlot}
-        <span className="meta truncate">{domain}</span>
-        <span className="meta shrink-0 before:mx-1.5 before:content-['·']">{formatDate(bookmark.createdAt)}</span>
-        <span className="ml-auto flex shrink-0 items-center gap-1">
-          {bookmark.favourite ? <Star size={13} className="fill-accent text-accent" /> : null}
-          {unread ? <span className="h-1.5 w-1.5 rounded-full bg-accent" title="Unread" /> : null}
-          {bookmark.health === "dead" ? <span className="font-mono text-[10px] uppercase text-danger">dead</span> : null}
-          {bookmark.health === "redirected" ? <span className="font-mono text-[10px] uppercase text-ink-3">moved</span> : null}
-        </span>
+        {unread ? <span aria-label="Unread" className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" /> : null}
+        <span className="min-w-0 truncate">{domain}</span>
+        {health}
+        <span className="ml-auto shrink-0 pr-2 tabular-nums">{age}</span>
       </header>
 
-      <h3 className={cn("line-clamp-2 font-display text-[17px] font-semibold leading-snug", pending && "text-ink-2")}>
+      <h3 className={cn("mt-2 line-clamp-2 text-[17px] leading-snug tracking-[-0.01em]", unread ? "font-bold" : "font-semibold", pending && !bookmark.summary && "text-ink-2")}>
         {/* A real link, so Tab reaches every card and the URL shows in the status bar; the click is handled by the card. */}
         <a href={bookmark.url} onClick={(e) => e.preventDefault()} onFocus={onFocus} className="outline-none">
-          {pending && !bookmark.description ? <span className="caret">{bookmark.title}</span> : title}
+          {title}
         </a>
       </h3>
 
-      {bookmark.summary ? (
-        <p className="mt-1.5 line-clamp-3 text-[14px] leading-[1.45] text-ink-2">{bookmark.summary}</p>
-      ) : pending ? (
-        <p className="mt-1.5 font-mono text-[11px] text-ink-3">Reading page…</p>
-      ) : bookmark.enrichment === "failed" ? (
-        <p className="mt-1.5 font-mono text-[11px] text-ink-3">Couldn&rsquo;t read this page, kept the link.</p>
+      {summary ? (
+        <p className={cn("mt-1.5 line-clamp-2 font-summary text-[15px] italic leading-[1.45] text-ink-2", !hadSummary && "anim-wipe")}>{summary}</p>
+      ) : bookmark.enrichment === "failed" && !pending ? (
+        <p className="mt-1.5 text-[13px] text-ink-3">Couldn&rsquo;t read this page</p>
       ) : null}
 
-      <div className="mt-3 pb-2.5">{tags}</div>
+      {bookmark.tags.length || tagDraft !== null ? <div className="mt-3">{tags}</div> : null}
 
-      <footer className="card-actions mt-auto flex h-8 items-center gap-1 border-t border-border" data-focused={focused}>
-        <span className={cn("font-mono text-[10.5px] uppercase tracking-[0.06em]", bookmark.enrichment === "done" ? "text-accent" : "text-ink-3")} title={aiLabel}>
-          {statusText}
-          {bookmark.readingMinutes ? <span className="text-ink-3"> · {bookmark.readingMinutes} min</span> : null}
-        </span>
-        <span className="card-buttons ml-auto flex items-center">
-          <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Copy link" aria-label="Copy link" onClick={(e) => { e.stopPropagation(); void copy() }}><Copy size={14} /></button>
-          <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Favourite" aria-label="Favourite" onClick={(e) => { e.stopPropagation(); void api.patch(bookmark.id, { favourite: !bookmark.favourite }) }}>
-            <Star size={14} className={cn(bookmark.favourite && "fill-accent text-accent")} />
-          </button>
-          <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Add tag" aria-label="Add tag" onClick={(e) => { e.stopPropagation(); setTagDraft("") }}><Tag size={14} /></button>
+      <footer className="card-actions -mb-1.5 -mr-1.5 mt-2 flex h-7 items-center" data-focused={focused}>
+        <span className="card-buttons flex w-full items-center justify-end gap-0.5">
+          {bookmark.readingMinutes ? <span className="mr-auto pr-2 text-[12px] text-ink-3">{bookmark.readingMinutes} min read</span> : null}
+          {starButton}
+          {doneButton}
+          {copyButton}
           {menu}
         </span>
       </footer>

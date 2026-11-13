@@ -11,7 +11,7 @@ interface Props {
   className?: string
 }
 
-/** 16px favicon with a letter fallback drawn in mono on the inset surface. No globe icons. */
+/** 16px favicon with a letter fallback on the inset surface. No globe icons. */
 export function Favicon({ url, src, size = 16, className }: Props) {
   const [failed, setFailed] = useState(false)
   const letter = (domainOf(url) || "?").charAt(0).toUpperCase()
@@ -19,8 +19,8 @@ export function Favicon({ url, src, size = 16, className }: Props) {
     return (
       <span
         aria-hidden
-        className={cn("inline-flex shrink-0 items-center justify-center bg-surface-2 font-mono text-[10px] font-medium text-ink-2", className)}
-        style={{ width: size, height: size, borderRadius: 2 }}
+        className={cn("inline-flex shrink-0 items-center justify-center bg-surface-2 text-[10px] font-semibold text-ink-2", className)}
+        style={{ width: size, height: size, borderRadius: 3 }}
       >
         {letter}
       </span>
@@ -37,7 +37,7 @@ export function Favicon({ url, src, size = 16, className }: Props) {
       referrerPolicy="no-referrer"
       onError={() => setFailed(true)}
       onLoad={(e) => { if (e.currentTarget.naturalWidth === 0) setFailed(true) }}
-      className={cn("shrink-0 rounded-[2px] object-contain", className)}
+      className={cn("shrink-0 rounded-[3px] object-contain", className)}
       style={{ width: size, height: size }}
     />
   )

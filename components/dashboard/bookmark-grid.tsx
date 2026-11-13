@@ -9,16 +9,22 @@ import { useDashboard } from "./provider"
 import { useKeyboard } from "./keyboard"
 
 const VIEW_EMPTY: Record<string, string> = {
-  unsorted: "Everything is filed.",
-  favourites: "No favourites yet. Press f on a card.",
-  reading: "Reading list is clear.",
-  archive: "Nothing archived.",
+  all: "Inbox zero. Paste a link to save the next one.",
+  favourites: "Nothing starred yet. Press f on a card.",
+  archive: "Nothing archived. Press d on a card when you are done with it.",
 }
+
+/** Only this many cards get a view-transition-name; more costs frames for nothing visible. */
+const TRANSITION_CAP = 40
+const FLASH_MS = 1200
+
+type RevealDetail = string | { id: string; flash?: boolean }
 
 export function BookmarkGrid() {
   const api = useDashboard()
   const { state, visible, hits } = api
   const [rawFocusId, setFocusId] = useState<string | null>(null)
+  const [flashId, setFlashId] = useState<string | null>(null)
 
   const items: Bookmark[] = useMemo(() => (hits ? hits.map((h) => h.bookmark) : visible), [hits, visible])
   // Title ranges from the ranker, so fuzzy hits are highlighted where they matched.
@@ -49,18 +55,29 @@ export function BookmarkGrid() {
     return () => io.disconnect()
   }, [limit, items.length])
 
-  // "Show" on a duplicate toast, or a palette hit: scroll to the card and focus it.
+  // A duplicate save, a palette hit or j/k past the slice: scroll to the card and focus it.
+  const flashTimer = useRef<number | undefined>(undefined)
   useEffect(() => {
     const onReveal = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail
+      const detail = (e as CustomEvent<RevealDetail>).detail
+      const { id, flash } = typeof detail === "string" ? { id: detail, flash: false } : detail
       const at = items.findIndex((b) => b.id === id)
       if (at >= limit) setLimit(at + PAGE)
       setFocusId(id)
-      requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.scrollIntoView({ block: "center" }))
+      if (flash) {
+        setFlashId(id)
+        window.clearTimeout(flashTimer.current)
+        flashTimer.current = window.setTimeout(() => setFlashId(null), FLASH_MS)
+      }
+      // Wait a frame (two, if the view just changed) for the card to exist.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-id="${id}"]`)?.scrollIntoView({ block: "center" })),
+      )
     }
     window.addEventListener("bookmark-ai:reveal", onReveal)
     return () => window.removeEventListener("bookmark-ai:reveal", onReveal)
   }, [items, limit])
+  useEffect(() => () => window.clearTimeout(flashTimer.current), [])
 
   if (state.bookmarks.length === 0) return <EmptyDrawer />
   if (items.length === 0) {
@@ -74,29 +91,32 @@ export function BookmarkGrid() {
     return <EmptyView label={label} />
   }
 
+  const grid = state.layout === "grid"
+
   return (
     <ul
       className={cn(
-        state.layout === "grid"
-          ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-          : "card overflow-hidden",
+        "min-w-0",
+        grid ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "-mx-2 flex flex-col sm:-mx-3",
       )}
     >
       {items.slice(0, limit).map((b, i) => (
         <IndexCard
           key={b.id}
           bookmark={b}
-          index={i}
           layout={state.layout}
           focused={focusId === b.id}
           pending={state.pending.has(b.id)}
           selected={state.selected.has(b.id)}
+          fresh={state.fresh.has(b.urlNormalized)}
+          flash={flashId === b.id}
+          transitionName={i < TRANSITION_CAP ? `card-${b.id}` : undefined}
           onFocus={() => setFocusId(b.id)}
           titleRanges={titleRanges.get(b.id)}
         />
       ))}
       {limit < items.length ? (
-        <li ref={sentinel} className="col-span-full py-6 text-center font-mono text-[11.5px] text-ink-3">
+        <li ref={sentinel} className="col-span-full py-6 text-center text-[13px] text-ink-3">
           {items.length - limit} more…
         </li>
       ) : null}
