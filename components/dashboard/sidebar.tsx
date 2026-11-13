@@ -60,7 +60,7 @@ function NavItem({ active, icon, label, count, onClick, tone }: { active: boolea
       )}
     >
       <span className={cn("shrink-0", active ? "text-ink" : "text-ink-3", tone === "danger" && "text-danger")}>{icon}</span>
-      <span className="isolate min-w-0 truncate">{active ? <Mark>{label}</Mark> : label}</span>
+      <span className="isolate min-w-0 truncate">{active ? <Mark insetY=".22em" tilt="-1.5deg">{label}</Mark> : label}</span>
       {count !== undefined ? <Count value={count} className={cn(tone === "danger" && "text-danger")} /> : null}
     </button>
   )

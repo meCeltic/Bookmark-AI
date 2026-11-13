@@ -1,10 +1,10 @@
 "use client"
 
-import { ArrowDownUp, Check, Command, LayoutGrid, Menu, Rows3, Search, X } from "lucide-react"
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
-import { domainOf, normalizeUrl } from "@/lib/url/normalize"
-import { cn, isMac } from "@/lib/utils"
-import { useMounted } from "@/lib/client/use-mounted"
+import { ArrowDownUp, Check, LayoutGrid, Menu, Rows3, Search, X } from "lucide-react"
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { normalizeUrl } from "@/lib/url/normalize"
+import { cn } from "@/lib/utils"
+import { usePresence } from "@/lib/client/use-presence"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Wordmark } from "@/components/wordmark"
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@/components/ui/menu"
@@ -32,7 +32,7 @@ interface Props {
 }
 
 /** One input. Typing filters, `#` picks a tag, a pasted URL flips it into Save mode. */
-export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
+export function TopBar({ onOpenMenu }: Props) {
   const api = useDashboard()
   const { state, counts } = api
   const [draft, setDraft] = useState("")
@@ -42,9 +42,6 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
   const [popDismissed, setPopDismissed] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listId = useId()
-  const mounted = useMounted()
-  // Keyboards only: phones get no shortcut in the placeholder.
-  const hintKey = mounted && typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches ? (isMac() ? "⌘K" : "Ctrl K") : ""
   const looksLikeUrl = draft.trim().length > 3 && normalizeUrl(draft.trim()) !== null && /[.:]/.test(draft) && !/\s/.test(draft.trim())
 
   // /save?url=… lands here as ?save=…; prefill it once, in Save mode.
@@ -65,14 +62,19 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
   // Tag autocomplete.
   const tokenMatch = looksLikeUrl ? null : TAG_TOKEN.exec(draft)
   const token = tokenMatch ? (tokenMatch[1] ?? "").toLowerCase() : null
-  const suggestions =
-    token === null
-      ? []
-      : counts.tags
-          .filter(({ tag }) => !state.tags.includes(tag) && tag.includes(token))
-          .sort((a, b) => Number(b.tag.startsWith(token)) - Number(a.tag.startsWith(token)))
-          .slice(0, 8)
+  const suggestions = useMemo(
+    () =>
+      token === null
+        ? []
+        : counts.tags
+            .filter(({ tag }) => !state.tags.includes(tag) && tag.includes(token))
+            .sort((a, b) => Number(b.tag.startsWith(token)) - Number(a.tag.startsWith(token)))
+            .slice(0, 8),
+    [token, counts.tags, state.tags],
+  )
   const popOpen = focused && token !== null && suggestions.length > 0 && popDismissed !== draft
+  // Stays mounted for the exit, showing the last suggestions.
+  const { item: shownSuggestions, state: popState } = usePresence(popOpen ? suggestions : null)
   const activeIndex = highlight.token === token ? Math.min(highlight.index, suggestions.length - 1) : 0
 
   const pickTag = (tag: string) => {
@@ -83,9 +85,10 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
 
   // Debounce the search query; URLs never hit the search, #tags become filters instead.
   useEffect(() => {
+    // A link turns the list into a single Save row; words search.
+    api.dispatch({ type: "omniUrl", url: looksLikeUrl ? draft.trim() : null })
     if (looksLikeUrl) {
-      // Show what is already filed from that site while the Save button is up.
-      api.dispatch({ type: "query", query: domainOf(normalizeUrl(draft.trim()) ?? "") })
+      api.dispatch({ type: "query", query: "" })
       return
     }
     const words = draft.replace(TAG_TOKENS, " ").trim()
@@ -154,6 +157,7 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
       {/* Phones: a bar fixed to the bottom, above the home indicator. Wider: inline in the header. */}
       <form
         className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:static sm:z-auto sm:min-w-0 sm:max-w-[720px] sm:flex-1 sm:border-0 sm:bg-transparent sm:p-0"
+        id="omnibox-form"
         onSubmit={(e) => { e.preventDefault(); void save() }}
         role="search"
       >
@@ -162,9 +166,8 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
           <input
             ref={inputRef}
             id="omnibox"
-            className={cn("field pl-9 text-[15px]", looksLikeUrl ? "pr-24" : draft ? "pr-10" : "pr-3")}
-            // The shortcut rides in the placeholder while the box is idle; no chip.
-            placeholder={`Search, #tag, or paste a link${!focused && hintKey ? `  ${hintKey}` : ""}`}
+            className={cn("field omni pl-9 text-[15px]", looksLikeUrl ? "pr-24" : draft ? "pr-10" : "pr-3")}
+            placeholder="Search, #tag, or paste a link"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
@@ -195,15 +198,15 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
             ) : null}
           </span>
 
-          {popOpen ? (
+          {shownSuggestions ? (
             <ul
               id={listId}
               role="listbox"
               aria-label="Tags"
-              data-state="open"
-              className="pop pop-anim absolute inset-x-0 bottom-full z-40 mb-2 max-h-64 overflow-y-auto p-1 [transform-origin:bottom_left] sm:bottom-auto sm:top-full sm:mb-0 sm:mt-1.5 sm:max-w-[320px] sm:[transform-origin:top_left]"
+              data-state={popState}
+              className={cn(popState === "closed" && "pointer-events-none", "pop suggest-anim absolute inset-x-0 bottom-full z-40 mb-2 max-h-64 overflow-y-auto p-1 [transform-origin:bottom_left] sm:bottom-auto sm:top-full sm:mb-0 sm:mt-1.5 sm:max-w-[320px] sm:[transform-origin:top_left]")}
             >
-              {suggestions.map(({ tag, count }, i) => (
+              {shownSuggestions.map(({ tag, count }, i) => (
                 <li
                   key={tag}
                   id={`${listId}-${i}`}
@@ -245,7 +248,6 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
           <button type="button" className={cn("btn btn-ghost btn-icon h-8 w-8", state.layout === "grid" ? "text-ink" : "text-ink-3")} aria-pressed={state.layout === "grid"} aria-label="Grid" title="Grid (g)" onClick={() => api.setLayout("grid")}><LayoutGrid size={15} /></button>
         </div>
 
-        <button type="button" className="btn btn-ghost btn-icon sm:hidden" aria-label="Commands" onClick={onOpenPalette}><Command size={16} /></button>
         <ThemeToggle />
       </div>
     </header>

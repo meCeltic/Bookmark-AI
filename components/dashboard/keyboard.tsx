@@ -13,6 +13,7 @@ interface Options {
 
 /**
  * j/k move (and carry the preview pane along), enter or o opens, f star, r read, d done (read + archive), e archive,
+ * u moves a Done card back to the Inbox,
  * shift+R read something, x select, c copy, backspace delete, g/l layout,
  * escape closes the pane, then clears. Ignored while typing.
  */
@@ -32,7 +33,7 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
       const previewing = api.state.preview !== null
       const focusOn = (id: string) => {
         setFocusId(id)
-        if (previewing) api.dispatch({ type: "preview", id })
+        if (previewing) api.setPreview(id)
       }
       const move = (delta: number) => {
         const next = items[Math.max(0, Math.min(items.length - 1, index + delta))]
@@ -59,7 +60,15 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
             if (e.key === "d" && !current.archivedAt) void api.done([current.id])
             else void api.toggleArchive(current)
             if (neighbour) focusOn(neighbour.id)
-            else if (previewing) api.dispatch({ type: "preview", id: null })
+            else if (previewing) api.setPreview(null)
+          }
+          break
+        case "u":
+          if (current?.archivedAt) {
+            const neighbour = items[index + 1] ?? items[index - 1]
+            void api.toggleArchive(current)
+            if (neighbour) focusOn(neighbour.id)
+            else if (previewing) api.setPreview(null)
           }
           break
         case "x": if (current) api.dispatch({ type: "select", ids: [current.id], mode: "toggle" }); break
@@ -73,7 +82,7 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
         case "a": case "A": if (e.shiftKey) { e.preventDefault(); api.dispatch({ type: "select", ids: items.map((b) => b.id), mode: "set" }) } break
         case "t": if (current) window.dispatchEvent(new CustomEvent("bookmark-ai:tag", { detail: current.id })); break
         case "Escape":
-          if (previewing) api.dispatch({ type: "preview", id: null })
+          if (previewing) api.setPreview(null)
           else if (api.state.selected.size) api.dispatch({ type: "select", ids: [], mode: "set" })
           else setFocusId(null)
           break

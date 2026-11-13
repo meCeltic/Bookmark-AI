@@ -13,6 +13,7 @@ const ROWS: Array<[string, string]> = [
   ["f", "Star"],
   ["r", "Mark read / unread"],
   ["e", "Move to Done / back to Inbox"],
+  ["u", "Move a Done card back to the Inbox"],
   ["⇧R", "Read something (random unread)"],
   ["t", "Add tag"],
   ["x", "Select card"],
