@@ -50,13 +50,15 @@ interface Props {
   /** View transition name, only for the first few dozen visible cards. */
   transitionName?: string
   onFocus: () => void
+  /** The pointer is over the card (the list ignores it while the keyboard drives). */
+  onHover?: () => void
   /** Open this card in the preview pane. */
   onPreview?: () => void
   /** Inclusive index pairs in the title that matched the search, if any. */
   titleRanges?: [number, number][]
 }
 
-export function IndexCard({ bookmark, layout, index = 0, focused, pending, selected, previewed, fresh, flash, transitionName, onFocus, onPreview, titleRanges }: Props) {
+export function IndexCard({ bookmark, layout, index = 0, focused, pending, selected, previewed, fresh, flash, transitionName, onFocus, onHover, onPreview, titleRanges }: Props) {
   const api = useDashboard()
   const [tagDraft, setTagDraft] = useState<string | null>(null)
   // The star pops when it is added (click, `f`, bulk), never when it is taken away.
@@ -149,7 +151,7 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
         <MenuItem onSelect={() => toggleSelect()}><Check size={14} /> {selected ? "Deselect" : "Select"}<span className="kbd ml-auto">x</span></MenuItem>
         <MenuSeparator />
         {archived ? (
-          <MenuItem onSelect={() => api.toggleArchive(bookmark)}><ArchiveRestore size={14} /> Back to Inbox<span className="kbd ml-auto">e</span></MenuItem>
+          <MenuItem onSelect={() => api.toggleArchive(bookmark)}><ArchiveRestore size={14} /> Move to Inbox<span className="kbd ml-auto">u</span></MenuItem>
         ) : (
           <MenuItem onSelect={() => api.done([bookmark.id])}><CheckCheck size={14} /> Done<span className="kbd ml-auto">d</span></MenuItem>
         )}
@@ -186,20 +188,33 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
       <Star key={starPops} size={14} className={cn(starPops > 0 && bookmark.favourite && "anim-star", bookmark.favourite && "fill-mark text-ink")} />
     </button>
   )
-  const doneButton = archived ? (
-    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Back to Inbox (e)" aria-label="Restore" onClick={(e) => { e.stopPropagation(); void api.toggleArchive(bookmark) }}>
-      <ArchiveRestore size={14} />
-    </button>
-  ) : (
-    <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Done: mark read, clear from Inbox (d)" aria-label="Done" onClick={(e) => { e.stopPropagation(); void api.done([bookmark.id]) }}>
-      <CheckCheck size={14} />
-    </button>
-  )
   const copyButton = (
     <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Copy link (c)" aria-label="Copy link" onClick={(e) => { e.stopPropagation(); void copy() }}>
       <Copy size={14} />
     </button>
   )
+  // Hover actions. In Done they are about getting a card back, so they say so in words.
+  const actions = (
+    <span className="row-actions" onClick={(e) => e.stopPropagation()}>
+      {archived ? (
+        <button type="button" className="btn btn-ghost btn-sm h-7 px-2" title="Move to Inbox (u)" onClick={() => void api.toggleArchive(bookmark)}>
+          Move to Inbox
+        </button>
+      ) : (
+        <>
+          {bookmark.readingMinutes ? <span className="mr-1 text-[12px] tabular-nums text-ink-3" title={`${bookmark.readingMinutes} min read`}>{bookmark.readingMinutes} min</span> : null}
+          {starButton}
+          <button type="button" className="btn btn-ghost btn-icon h-7 w-7" title="Done: mark read, clear from Inbox (d)" aria-label="Done" onClick={() => void api.done([bookmark.id])}>
+            <CheckCheck size={14} />
+          </button>
+        </>
+      )}
+      {copyButton}
+      <span className="row-more">{menu}</span>
+    </span>
+  )
+  // Touch screens and phones have no hover: the ⋯ stays out.
+  const touchMore = <span className="row-touch-more" onClick={(e) => e.stopPropagation()}>{menu}</span>
 
   const tagInput =
     tagDraft !== null ? (
@@ -285,7 +300,8 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
     "data-previewed": Boolean(previewed),
     "data-editing": tagDraft !== null,
     onClick: onCardClick,
-    onMouseEnter: onFocus,
+    onMouseEnter: onHover ?? onFocus,
+    onMouseMove: onHover,
     style: transitionName ? ({ viewTransitionName: transitionName } as CSSProperties) : undefined,
   }
   const titleLink = (className: string) => (
@@ -305,13 +321,11 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
 
   // ---------------------------------------------------------------- list ----
   if (layout === "list") {
-    const meta = `${domain} · ${age}`
-    const lead = Boolean(summary || failed)
     return (
       <li
         {...common}
         className={cn(
-          "row group relative min-w-0 cursor-pointer grid-cols-[16px_minmax(0,1fr)_28px] gap-x-3 px-2 py-2 sm:px-3",
+          "row row-list group relative min-w-0 cursor-pointer gap-x-3 px-2 py-2 sm:px-3",
           pending && "reading",
           fresh && "anim-enter",
           flash && "flash-ring",
@@ -324,33 +338,24 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
             {bookmark.favourite ? (
               <Star key={starPops} size={12} aria-label="Starred" fill="var(--mark)" stroke="none" className={cn("shrink-0", starPops > 0 && "anim-star")} />
             ) : null}
+            {health}
             {tagInput}
           </div>
-          {/* Line 2. Wide: summary, then · domain · age. Phones: domain · age first, summary after. */}
-          <div className="mt-0.5 flex h-5 min-w-0 items-baseline text-[13px] leading-5 text-ink-3">
-            {summary ? (
-              <span className={cn("min-w-0 truncate font-summary text-[14px] italic", !hadSummary && "anim-wipe")}>{summary}</span>
-            ) : failed ? (
-              <span className="min-w-0 truncate">Couldn&rsquo;t read this page</span>
-            ) : null}
-            <span className="flex min-w-0 shrink-0 items-baseline whitespace-pre max-sm:order-first max-sm:max-w-[75%]">
-              {lead ? <span className="max-sm:hidden"> · </span> : null}
-              <span className="min-w-0 truncate">{meta}</span>
-              {health ? <><span> · </span>{health}</> : null}
-              {lead ? <span className="sm:hidden"> · </span> : null}
-            </span>
-          </div>
+          {/* Line 2: the summary, stopping short of the meta column. Phones: up to two lines, meta on line 3. */}
+          {summary ? (
+            <p className={cn("mt-0.5 truncate font-summary text-[14px] italic leading-5 text-ink-2 max-sm:line-clamp-2 max-sm:whitespace-normal", !hadSummary && "anim-wipe")}>{summary}</p>
+          ) : failed ? (
+            <p className="mt-0.5 truncate text-[13px] leading-5 text-ink-3">Couldn&rsquo;t read this page</p>
+          ) : null}
+          <p className="mt-0.5 flex min-w-0 text-[13px] leading-5 text-ink-3 sm:hidden"><span className="min-w-0 truncate">{domain}</span><span className="shrink-0 whitespace-pre"> · {age}</span></p>
         </div>
-        <div onClick={(e) => e.stopPropagation()} className="hover-reveal touch-show flex items-center justify-end">{menu}</div>
-        {/* Hover actions float over the end of line 2, left of the ⋯; touch uses the ⋯ menu. */}
-        <span className="card-actions pointer-events-none absolute bottom-[6px] right-[44px] hidden items-center sm:right-[48px] [@media(hover:hover)]:md:flex" data-focused={focused}>
-          <span className="card-buttons pointer-events-auto flex items-center gap-0.5 rounded-[6px] bg-surface-2 pl-2">
-            {bookmark.readingMinutes ? <span className="mr-1 text-[12px] text-ink-3">{bookmark.readingMinutes} min read</span> : null}
-            {starButton}
-            {doneButton}
-            {copyButton}
-          </span>
-        </span>
+        {/* Wide: a fixed column for domain · age; hover swaps it for the actions, so nothing covers the summary. */}
+        <div className="row-slot max-sm:hidden">
+          {/* The domain gives way before the age does. */}
+          <span className="row-meta flex min-w-0 text-[13px] text-ink-3"><span className="min-w-0 truncate">{domain}</span><span className="shrink-0 whitespace-pre"> · {age}</span></span>
+          {actions}
+        </div>
+        {touchMore}
       </li>
     )
   }
@@ -360,7 +365,7 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
     <li
       {...common}
       className={cn(
-        "card group relative flex min-w-0 cursor-pointer flex-col p-4 outline-none",
+        "card group relative flex min-w-0 cursor-pointer flex-col p-5 outline-none",
         pending && "reading",
         fresh && "anim-enter",
         flash && "flash-ring",
@@ -368,12 +373,15 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
     >
       {bookmark.favourite ? <span aria-hidden className="fold" /> : null}
 
-      <header className="flex min-w-0 items-center gap-2 text-[13px] text-ink-3">
+      <header className="flex h-5 min-w-0 items-center gap-2 text-[13px] text-ink-3">
         {selectSlot}
-        {unread ? <span aria-label="Unread" className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" /> : null}
         <span className="min-w-0 truncate">{domain}</span>
         {health}
-        <span className="ml-auto shrink-0 pr-2 tabular-nums">{age}</span>
+        <span className="row-slot ml-auto shrink-0 pr-1">
+          <span className="row-meta">{age}</span>
+          {actions}
+        </span>
+        {touchMore}
       </header>
 
       <h3 className={cn("mt-2 line-clamp-2 text-[17px] leading-snug tracking-[-0.01em]", unread ? "font-bold" : "font-semibold", pending && !bookmark.summary && "text-ink-2")}>
@@ -387,16 +395,6 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
       ) : null}
 
       {bookmark.tags.length || tagDraft !== null ? <div className="mt-3">{tags}</div> : null}
-
-      <footer className="card-actions -mb-1.5 -mr-1.5 mt-2 flex h-7 items-center" data-focused={focused}>
-        <span className="card-buttons flex w-full items-center justify-end gap-0.5">
-          {bookmark.readingMinutes ? <span className="mr-auto pr-2 text-[12px] text-ink-3">{bookmark.readingMinutes} min read</span> : null}
-          {starButton}
-          {doneButton}
-          {copyButton}
-          {menu}
-        </span>
-      </footer>
     </li>
   )
 }

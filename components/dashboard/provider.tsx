@@ -56,6 +56,15 @@ interface State {
   rev: number
   /** The card shown in the preview pane, if open. */
   preview: string | null
+  /**
+   * Inbox cards read during this visit. They keep their place among the unread
+   * until the view changes or the page reloads, then join the folded Read group.
+   */
+  held: Set<string>
+  /** Inbox: the Read group is unfolded (remembered in prefs). */
+  readOpen: boolean
+  /** The link typed into the omnibox, when it holds one: the list becomes a Save row. */
+  omniUrl: string | null
 }
 
 type Action =
@@ -75,6 +84,21 @@ type Action =
   | { type: "swap"; from: string; bookmark: Bookmark }
   | { type: "fresh"; key: string; on: boolean }
   | { type: "preview"; id: string | null }
+  | { type: "readOpen"; open: boolean }
+  | { type: "omniUrl"; url: string | null }
+
+/** Cards that just turned read while still in the Inbox stay put until the view changes. */
+function holdNewlyRead(state: State, next: Bookmark[]): Set<string> {
+  let held = state.held
+  for (const b of next) {
+    const prev = state.bookmarks.find((x) => x.id === b.id)
+    if (prev && prev.readAt === null && b.readAt !== null && !b.archivedAt && !held.has(b.id)) {
+      if (held === state.held) held = new Set(held)
+      held.add(b.id)
+    }
+  }
+  return held
+}
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -85,6 +109,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         rev: state.rev + 1,
+        held: holdNewlyRead(state, [action.bookmark]),
         bookmarks: exists
           ? state.bookmarks.map((b) => (b.id === action.bookmark.id ? action.bookmark : b))
           : [action.bookmark, ...state.bookmarks],
@@ -94,7 +119,7 @@ function reducer(state: State, action: Action): State {
       const byId = new Map(action.bookmarks.map((b) => [b.id, b]))
       const merged = state.bookmarks.map((b) => byId.get(b.id) ?? b)
       const fresh = action.bookmarks.filter((b) => !state.bookmarks.some((x) => x.id === b.id))
-      return { ...state, rev: state.rev + 1, bookmarks: [...fresh, ...merged] }
+      return { ...state, rev: state.rev + 1, held: holdNewlyRead(state, action.bookmarks), bookmarks: [...fresh, ...merged] }
     }
     case "remove": {
       const ids = new Set(action.ids)
@@ -120,7 +145,7 @@ function reducer(state: State, action: Action): State {
       return { ...state, selected }
     }
     case "view":
-      return { ...state, view: action.view, selected: new Set(), healthFilter: null, preview: null }
+      return { ...state, view: action.view, selected: new Set(), healthFilter: null, preview: null, held: new Set() }
     case "tags":
       return { ...state, tags: action.tags }
     case "query":
@@ -150,6 +175,10 @@ function reducer(state: State, action: Action): State {
     }
     case "preview":
       return state.preview === action.id ? state : { ...state, preview: action.id }
+    case "readOpen":
+      return { ...state, readOpen: action.open }
+    case "omniUrl":
+      return state.omniUrl === action.url ? state : { ...state, omniUrl: action.url }
   }
 }
 
@@ -162,6 +191,12 @@ export interface DashboardApi {
   hits: SearchHit[] | null
   counts: { views: ReturnType<typeof viewCounts>; collections: Map<string, number>; tags: ReturnType<typeof tagCounts> }
   dispatch: (action: Action) => void
+  /** Search hits for the same query in the other drawer (Done, or the Inbox when in Done). */
+  elsewhere: { view: "all" | "archive"; count: number } | null
+  /** Open, move or close the preview pane; opening and closing slide on wide screens. */
+  setPreview: (id: string | null) => void
+  /** Fold or unfold the Inbox's Read group. */
+  setReadOpen: (open: boolean) => void
 
   addBookmark: (raw: string, opts?: { collectionId?: string | null }) => Promise<Bookmark | null>
   reEnrich: (id: string) => Promise<void>
@@ -232,6 +267,9 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     fresh: new Set<string>(),
     rev: 0,
     preview: null,
+    held: new Set<string>(),
+    readOpen: false,
+    omniUrl: null,
   }))
   const [hydrated, setHydrated] = useState(mode === "cloud")
   const enrichAborts = useRef(new Map<string, AbortController>())
@@ -239,11 +277,13 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   const latest = useRef(state.bookmarks)
   const latestCollections = useRef(state.collections)
   const latestView = useRef(state.view)
+  const latestPreview = useRef(state.preview)
   useEffect(() => {
     latest.current = state.bookmarks
     latestCollections.current = state.collections
     latestView.current = state.view
-  }, [state.bookmarks, state.collections, state.view])
+    latestPreview.current = state.preview
+  }, [state.bookmarks, state.collections, state.view, state.preview])
 
   const reload = useCallback(async () => {
     const [bookmarks, collections] = await Promise.all([repo.listBookmarks(), repo.listCollections()])
@@ -255,6 +295,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     const prefs = readPrefs()
     dispatch({ type: "layout", layout: prefs.layout })
     dispatch({ type: "sort", sort: prefs.sort })
+    dispatch({ type: "readOpen", open: prefs.readOpen })
     if (mode === "cloud") return
     let cancelled = false
     ;(async () => {
@@ -288,6 +329,14 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     () => (state.query.trim().length >= 2 ? searchBookmarks(index, state.query) : null),
     [index, state.query],
   )
+
+  // While searching, how many hits the other drawer holds, so the heading can point there.
+  const elsewhere = useMemo<DashboardApi["elsewhere"]>(() => {
+    if (state.query.trim().length < 2) return null
+    const other = state.view.kind === "view" && state.view.view === "archive" ? "all" : "archive"
+    const pool = applyFilter(state.bookmarks, { view: { kind: "view", view: other }, tags: state.tags, health: null, sort: state.sort })
+    return { view: other, count: pool.length ? searchBookmarks(createSearchIndex(pool), state.query).length : 0 }
+  }, [state.bookmarks, state.view, state.tags, state.sort, state.query])
 
   const counts = useMemo(
     () => ({
@@ -539,6 +588,19 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
     [patchMany],
   )
 
+  const setPreview = useCallback<DashboardApi["setPreview"]>((id) => {
+    // Wide screens: the pane is a column, so opening or closing it reflows the list; slide both.
+    const wide = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(min-width: 1024px)").matches
+    const toggles = (latestPreview.current === null) !== (id === null)
+    latestPreview.current = id
+    if (wide && toggles) void withTransition(() => dispatch({ type: "preview", id }))
+    else dispatch({ type: "preview", id })
+  }, [])
+
+  const setReadOpen = useCallback<DashboardApi["setReadOpen"]>((open) => {
+    withTransition(() => dispatch({ type: "readOpen", open }))
+  }, [])
+
   const setLayout = useCallback<DashboardApi["setLayout"]>((layout) => {
     withTransition(() => dispatch({ type: "layout", layout }))
   }, [])
@@ -576,11 +638,9 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       const stamp = new Date().toISOString()
       const p: BookmarkPatch = { lastOpenedAt: stamp, readAt: bookmark.readAt ?? stamp }
       const current = latest.current.find((b) => b.id === bookmark.id) ?? bookmark
-      // Becoming read moves the row into the Read group, so it slides there.
-      const run = bookmark.readAt ? (fn: () => void) => { fn(); return Promise.resolve() } : withTransition
-      void run(() => dispatch({ type: "upsert", bookmark: { ...current, ...p, updatedAt: stamp } })).then(() =>
-        applyRemotePatch(bookmark.id, p, current, true),
-      )
+      // The row keeps its place (the reducer holds it) until the view changes.
+      dispatch({ type: "upsert", bookmark: { ...current, ...p, updatedAt: stamp } })
+      void applyRemotePatch(bookmark.id, p, current, true)
       if (!bookmark.archivedAt && !readFlag("done-hint")) {
         writeFlag("done-hint")
         toast("Read it? Press d to clear it from your Inbox", { duration: 6000 })
@@ -810,8 +870,8 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
 
   // Persist layout and sort.
   useEffect(() => {
-    if (hydrated) writePrefs({ layout: state.layout, sort: state.sort })
-  }, [state.layout, state.sort, hydrated])
+    if (hydrated) writePrefs({ layout: state.layout, sort: state.sort, readOpen: state.readOpen })
+  }, [state.layout, state.sort, state.readOpen, hydrated])
 
   const api = useMemo<DashboardApi>(
     () => ({
@@ -821,6 +881,9 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       hits,
       counts,
       dispatch,
+      elsewhere,
+      setPreview,
+      setReadOpen,
       addBookmark,
       reEnrich,
       patch,
@@ -847,7 +910,7 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       reload,
     }),
     [
-      mode, state, visible, hits, counts, addBookmark, reEnrich, patch, patchMany, done, toggleArchive, readSomething, setLayout, remove, open, markOpened, addTag, removeTag,
+      mode, state, visible, hits, counts, elsewhere, setPreview, setReadOpen, addBookmark, reEnrich, patch, patchMany, done, toggleArchive, readSomething, setLayout, remove, open, markOpened, addTag, removeTag,
       renameTag, createCollection, renameCollection, deleteCollection, importItems, readPending, checkHealth, reveal, resetDemo, reload,
     ],
   )

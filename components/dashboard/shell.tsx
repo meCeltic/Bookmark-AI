@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState, useSyncExternalStore } from "react"
+import { useEffect, useState } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { MoreHorizontal, Pencil, Trash2, X } from "lucide-react"
+import { ArrowRight, MoreHorizontal, Pencil, Trash2, X } from "lucide-react"
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@/components/ui/menu"
 import { useDashboard } from "./provider"
 import { Sidebar } from "./sidebar"
@@ -15,7 +15,6 @@ import { BulkBar } from "./bulk-bar"
 import { HelpSheet } from "./help-sheet"
 import { SaveToast } from "./save-toast"
 import { PreviewPane } from "./preview-pane"
-import { readFlag } from "@/lib/client/prefs"
 
 interface Props {
   userLabel: string
@@ -24,13 +23,6 @@ interface Props {
 }
 
 const VIEW_HEADING = { all: "Inbox", favourites: "Starred", archive: "Done" } as const
-
-// "Has this browser ever saved a link?" Read after mount; flips on the first save.
-const subscribeFlag = (cb: () => void) => {
-  window.addEventListener("bookmark-ai:flag", cb)
-  return () => window.removeEventListener("bookmark-ai:flag", cb)
-}
-const readSavedOnce = () => readFlag("saved-once")
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
@@ -56,13 +48,30 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
       ? (state.collections.find((c) => c.id === view.id)?.name ?? "Collection")
       : VIEW_HEADING[view.view]
 
-  const savedOnce = useSyncExternalStore(subscribeFlag, readSavedOnce, () => true)
-
   const shown = api.hits ? api.hits.length : api.visible.length
   const unreadHere = api.visible.filter((b) => b.readAt === null && !b.archivedAt).length
   const inInbox = view.kind === "view" && view.view === "all" && !state.healthFilter
+  const inDone = view.kind === "view" && view.view === "archive"
+  // Searching: where the hits are, with a way across to the other drawer.
+  const elsewhere = api.elsewhere
   const summary = api.hits
-    ? plural(shown, "match", "matches")
+    ? (
+        <>
+          {`${shown} in ${heading}`}
+          {elsewhere && elsewhere.count > 0 ? (
+            <>
+              {" · "}
+              <button
+                type="button"
+                className="inline-flex items-center gap-0.5 text-action hover:underline"
+                onClick={() => api.dispatch({ type: "view", view: { kind: "view", view: elsewhere.view } })}
+              >
+                {elsewhere.count} in {elsewhere.view === "archive" ? "Done" : "Inbox"} <ArrowRight size={12} aria-hidden />
+              </button>
+            </>
+          ) : null}
+        </>
+      )
     : inInbox
       ? `${unreadHere} to read · ${shown - unreadHere} read`
       : view.kind === "view" && view.view === "archive"
@@ -92,7 +101,7 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
           <main className="quiet-scroll min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-24">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
               <h1 className="min-w-0 truncate text-[22px] font-bold tracking-[-0.02em]">{heading}</h1>
-              <span className="text-[13px] tabular-nums text-ink-3">{summary}</span>
+              {state.omniUrl ? null : <span className="text-[13px] tabular-nums text-ink-3">{summary}</span>}
               {state.tags.length ? (
                 <span className="flex min-w-0 flex-wrap items-center gap-x-2">
                   {state.tags.map((t) => <ActiveTag key={t} tag={t} />)}
@@ -104,7 +113,11 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
                 </button>
               ) : null}
             </div>
-            {savedOnce || !inInbox || api.hits ? null : <p className="mt-1 text-[13px] text-ink-3">Paste any link in the search box to save it</p>}
+            {state.omniUrl || api.hits ? null : inInbox && api.visible.length === 0 && state.bookmarks.length > 0 ? (
+              <p className="mt-1 text-[13px] text-ink-3">Paste any link in the search box to save it</p>
+            ) : inDone && api.visible.length > 0 ? (
+              <p className="mt-1 text-[13px] text-ink-3">Done items leave your Inbox · <span className="kbd">u</span> moves one back</p>
+            ) : null}
             <div className="mt-4">
               <BookmarkGrid />
             </div>

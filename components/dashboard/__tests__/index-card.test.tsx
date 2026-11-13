@@ -23,7 +23,7 @@ const useGrid = () => window.localStorage.setItem("bookmark-ai:prefs", JSON.stri
 afterEach(() => window.localStorage.clear())
 
 describe("IndexCard", () => {
-  it("defaults to two-line list rows: linked title, serif summary, then domain and age; no tags, dot or fold", async () => {
+  it("defaults to list rows: linked title, ink-2 serif summary, domain · age in its own column; no tags, dot or fold", async () => {
     const { container } = await mountWithRepo(<BookmarkGrid />, seed)
     const row = container.querySelector("li.row")!
     expect(row).not.toBeNull()
@@ -32,7 +32,11 @@ describe("IndexCard", () => {
     expect(link).toHaveAttribute("target", "_blank")
     expect(link).toHaveClass("font-semibold")
     expect(screen.getByText(/official tour/).className).toContain("font-summary")
-    expect(screen.getByText(/^postgresql\.org · /)).toBeInTheDocument()
+    expect(screen.getByText(/official tour/)).toHaveClass("text-ink-2")
+    // Wide screens: the meta sits in the right slot, which swaps to the actions on hover.
+    const meta = row.querySelector(".row-slot .row-meta")!
+    expect(meta.textContent).toMatch(/^postgresql\.org · /)
+    expect(row.querySelector(".row-slot .row-actions")!.contains(screen.getByRole("button", { name: "Done" }))).toBe(true)
     expect(screen.queryByRole("button", { name: "postgres" })).toBeNull()
     expect(screen.queryByLabelText("Unread")).toBeNull()
     expect(row.querySelector(".fold")).toBeNull()
@@ -46,15 +50,56 @@ describe("IndexCard", () => {
     expect(container.querySelector(".fold")).toBeNull()
   })
 
-  it("lists unread rows first in the Inbox, then a Read divider and the read ones", async () => {
+  it("folds the Read group in the Inbox into one line, unfolds on click and remembers it", async () => {
     await mountWithRepo(<BookmarkGrid />, [
       { url: "https://a.example/read", title: "Already read", readAt: new Date().toISOString() },
       { url: "https://b.example/new", title: "Still unread" },
     ])
-    const titles = screen.getAllByRole("link").map((a) => a.textContent)
-    expect(titles).toEqual(["Still unread", "Already read"])
-    expect(screen.getByRole("separator", { name: "Read" })).toBeInTheDocument()
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Still unread"])
+    const fold = screen.getByRole("button", { name: /1 read/ })
+    expect(fold).toHaveAttribute("aria-expanded", "false")
+    expect(screen.getByRole("button", { name: "Mark all done" })).toBeInTheDocument()
+    fireEvent.click(fold)
+    await waitFor(() => expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["Still unread", "Already read"]))
     expect(screen.getByRole("link", { name: "Already read" })).toHaveClass("font-normal")
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem("bookmark-ai:prefs") ?? "{}").readOpen).toBe(true))
+  })
+
+  it("Mark all done clears the read ones out of the Inbox", async () => {
+    const { repo } = await mountWithRepo(<BookmarkGrid />, [
+      { url: "https://a.example/read", title: "Already read", readAt: new Date().toISOString() },
+      { url: "https://b.example/new", title: "Still unread" },
+    ])
+    fireEvent.click(screen.getByRole("button", { name: "Mark all done" }))
+    await waitFor(async () => expect((await repo.listBookmarks()).find((b) => b.title === "Already read")!.archivedAt).not.toBeNull())
+    await waitFor(() => expect(screen.queryByRole("button", { name: /1 read/ })).toBeNull())
+    expect((await repo.listBookmarks()).find((b) => b.title === "Still unread")!.archivedAt).toBeNull()
+  })
+
+  it("an opened link keeps its place, unbolded, until the view changes; then it joins the fold", async () => {
+    vi.spyOn(window, "open").mockImplementation(() => null)
+    const { container } = await mountWithRepo(<BookmarkGrid />, [
+      { url: "https://a.example/one", title: "One", createdAt: new Date(Date.now() - 1000).toISOString() },
+      { url: "https://b.example/two", title: "Two", createdAt: new Date(Date.now() - 2000).toISOString() },
+    ])
+    const link = screen.getByRole("link", { name: "One" })
+    link.addEventListener("click", (e) => e.preventDefault())
+    fireEvent.click(link)
+    await waitFor(() => expect(screen.getByRole("link", { name: "One" })).toHaveClass("font-normal"))
+    expect(screen.getAllByRole("link").map((a) => a.textContent)).toEqual(["One", "Two"])
+    expect(screen.queryByRole("button", { name: /read$/ })).toBeNull()
+    expect(container.querySelector("li.row")).not.toBeNull()
+  })
+
+  it("keyboard use puts data-keys on the list until the pointer really moves", async () => {
+    Element.prototype.scrollIntoView = vi.fn()
+    const { container } = await mountWithRepo(<BookmarkGrid />, seed)
+    const list = container.querySelector("ul.cards")!
+    expect(list.hasAttribute("data-keys")).toBe(false)
+    fireEvent.keyDown(document.body, { key: "j" })
+    expect(list.hasAttribute("data-keys")).toBe(true)
+    fireEvent.mouseMove(document.body, { screenX: 10, screenY: 10 })
+    expect(list.hasAttribute("data-keys")).toBe(false)
   })
 
   it("renders the card anatomy in grid layout: summary in the serif, plain tags, reading time only in the actions", async () => {
@@ -64,11 +109,12 @@ describe("IndexCard", () => {
     const summary = screen.getByText(/official tour/)
     expect(summary.className).toContain("font-summary")
     expect(screen.getByRole("button", { name: "postgres" })).toHaveClass("tag")
-    expect(screen.getByText("7 min read").closest(".card-buttons")).not.toBeNull()
+    expect(screen.getByText("7 min").closest(".row-actions")).not.toBeNull()
     expect(screen.queryByText(/ai summary/i)).toBeNull()
-    // Unread: bold title and the action dot.
+    // Unread: a bold title, no dot.
     expect(screen.getByRole("heading", { name: /Full Text Search/ })).toHaveClass("font-bold")
-    expect(screen.getByLabelText("Unread")).toBeInTheDocument()
+    expect(screen.queryByLabelText("Unread")).toBeNull()
+    expect(container.querySelector("li.card")).toHaveClass("p-5")
   })
 
   it("says it could not read the page only when enrichment failed", async () => {
