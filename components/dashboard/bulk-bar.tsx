@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, BookOpen, Download, FolderInput, Star, Tag, Trash2, X, HeartPulse } from "lucide-react"
+import { Archive, BookOpen, CheckCheck, Download, FolderInput, Star, Tag, Trash2, X, HeartPulse } from "lucide-react"
 import { useState } from "react"
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@/components/ui/menu"
 import { useDashboard } from "./provider"
@@ -13,14 +13,16 @@ export function BulkBar({ onExport }: { onExport: () => void }) {
   const ids = [...selected]
 
   return (
-    <div className="card anim-pop fixed inset-x-0 bottom-0 z-30 flex items-center gap-0.5 overflow-x-auto whitespace-nowrap rounded-none border-x-0 border-b-0 px-2 py-2 shadow-card sm:inset-x-auto sm:bottom-4 sm:left-1/2 sm:max-w-[calc(100vw-24px)] sm:-translate-x-1/2 sm:rounded-[2px] sm:border sm:py-1.5">
-      <span className="px-2 font-mono text-[12px]">{ids.length} selected</span>
-      <button type="button" className="btn btn-ghost btn-sm" title="Favourite" onClick={() => api.patchMany(ids, { favourite: true }, "favourited")}><Star size={14} /><span className="hidden md:inline">Favourite</span></button>
+    // Phones: sits on top of the bottom omnibox. Wider: floats centred above the list.
+    <div role="toolbar" aria-label="Selection" className="pop anim-rise fixed inset-x-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-30 flex min-w-0 items-center gap-0.5 overflow-x-auto whitespace-nowrap px-1.5 py-1.5 sm:inset-x-0 sm:bottom-5 sm:mx-auto sm:w-max sm:max-w-[calc(100vw-24px)]">
+      <span className="px-2 text-[13px] font-medium tabular-nums">{ids.length} selected</span>
+      <button type="button" className="btn btn-ghost btn-sm" title="Done: mark read and archive" onClick={() => api.done(ids)}><CheckCheck size={14} /><span className="hidden md:inline">Done</span></button>
+      <button type="button" className="btn btn-ghost btn-sm" title="Star" onClick={() => api.patchMany(ids, { favourite: true }, "starred")}><Star size={14} /><span className="hidden md:inline">Star</span></button>
       <button type="button" className="btn btn-ghost btn-sm" title="Mark read" onClick={() => api.patchMany(ids, { readAt: new Date().toISOString() }, "marked read")}><BookOpen size={14} /><span className="hidden md:inline">Read</span></button>
       <MenuRoot>
         <MenuTrigger asChild><button type="button" className="btn btn-ghost btn-sm" title="Move to collection"><FolderInput size={14} /><span className="hidden md:inline">Move</span></button></MenuTrigger>
         <MenuContent side="top">
-          <MenuItem onSelect={() => api.patchMany(ids, { collectionId: null }, "unsorted")}>Unsorted</MenuItem>
+          <MenuItem onSelect={() => api.patchMany(ids, { collectionId: null }, "took out of collections")}>No collection</MenuItem>
           {collections.map((c) => <MenuItem key={c.id} onSelect={() => api.patchMany(ids, { collectionId: c.id }, `moved to ${c.name}`)}>{c.name}</MenuItem>)}
         </MenuContent>
       </MenuRoot>
@@ -29,7 +31,8 @@ export function BulkBar({ onExport }: { onExport: () => void }) {
       ) : (
         <input
           autoFocus
-          className="rule-input w-28 py-1 text-[13px]"
+          className="field h-8 w-28 text-[13px]"
+          aria-label="Tag for selected cards"
           placeholder="tag, enter"
           value={tag}
           onChange={(e) => setTag(e.target.value)}
@@ -42,7 +45,7 @@ export function BulkBar({ onExport }: { onExport: () => void }) {
       )}
       <button type="button" className="btn btn-ghost btn-sm" title="Check links" onClick={() => api.checkHealth(ids)}><HeartPulse size={14} /><span className="hidden md:inline">Check</span></button>
       <button type="button" className="btn btn-ghost btn-sm" title="Export selection" onClick={onExport}><Download size={14} /><span className="hidden md:inline">Export</span></button>
-      <button type="button" className="btn btn-ghost btn-sm" title="Archive" onClick={() => api.patchMany(ids, { archivedAt: new Date().toISOString() }, "archived")}><Archive size={14} /><span className="hidden md:inline">Archive</span></button>
+      <button type="button" className="btn btn-ghost btn-sm" title="Archive" onClick={() => api.patchMany(ids, { archivedAt: new Date().toISOString() }, "archived", { move: true })}><Archive size={14} /><span className="hidden md:inline">Archive</span></button>
       <button type="button" className="btn btn-ghost btn-sm text-danger" title="Delete" onClick={() => api.remove(ids)}><Trash2 size={14} /><span className="hidden md:inline">Delete</span></button>
       <button type="button" className="btn btn-ghost btn-icon sticky right-0 ml-auto h-7 w-7 bg-surface" aria-label="Clear selection" onClick={() => api.dispatch({ type: "select", ids: [], mode: "set" })}><X size={14} /></button>
     </div>

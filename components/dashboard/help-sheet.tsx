@@ -7,15 +7,18 @@ const ROWS: Array<[string, string]> = [
   ["⌘K", "Command palette"],
   ["j / k", "Next / previous card"],
   ["↵", "Open card"],
-  ["f", "Favourite"],
+  ["d", "Done: mark read and archive"],
+  ["f", "Star"],
   ["r", "Mark read / unread"],
   ["e", "Archive / restore"],
-  ["t", "Add tag (from the card menu)"],
+  ["⇧R", "Read something (random unread)"],
+  ["t", "Add tag"],
   ["x", "Select card"],
   ["⇧A", "Select all"],
   ["c", "Copy link"],
   ["⌫", "Delete (undoable)"],
   ["g / l", "Grid / list"],
+  ["#", "Filter by tag (in search)"],
   ["?", "This sheet"],
 ]
 
@@ -23,9 +26,9 @@ export function HelpSheet({ open, onOpenChange }: { open: boolean; onOpenChange:
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title="Keyboard" description="Everything works without a mouse." noAutoFocus>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 p-5 text-[13.5px]">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-1 p-5 text-[13px] sm:grid-cols-2">
           {ROWS.map(([key, label]) => (
-            <div key={key} className="flex items-center justify-between gap-3 border-b border-border py-1">
+            <div key={key} className="flex min-w-0 items-center justify-between gap-3 border-b border-line py-1.5">
               <dt className="text-ink-2">{label}</dt>
               <dd className="flex gap-1">{key.split(" ").map((k) => <kbd key={k} className="kbd">{k}</kbd>)}</dd>
             </div>

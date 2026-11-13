@@ -12,8 +12,9 @@ interface Options {
 }
 
 /**
- * j/k move, enter opens, f favourite, r read, e archive, x select, c copy,
- * backspace delete, g/l layout, escape clears. Ignored while typing.
+ * j/k move, enter opens, f star, r read, d done (read + archive), e archive,
+ * shift+R read something, x select, c copy, backspace delete, g/l layout,
+ * escape clears. Ignored while typing.
  */
 export function useKeyboard({ items, focusId, setFocusId }: Options) {
   const api = useDashboard()
@@ -32,7 +33,7 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
           setFocusId(next.id)
           const el = document.querySelector<HTMLElement>(`[data-id="${next.id}"]`)
           if (el) el.scrollIntoView({ block: "nearest" })
-          else window.dispatchEvent(new CustomEvent("bookmark-ai:reveal", { detail: next.id }))
+          else window.dispatchEvent(new CustomEvent("bookmark-ai:reveal", { detail: { id: next.id } }))
         }
       }
 
@@ -42,10 +43,14 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
         case "Enter": if (current) { e.preventDefault(); api.open(current) } break
         case "f": if (current) void api.patch(current.id, { favourite: !current.favourite }); break
         case "r": if (current) void api.patch(current.id, { readAt: current.readAt ? null : new Date().toISOString() }); break
+        case "R": e.preventDefault(); api.readSomething(); break
         case "e":
+        case "d":
           if (current) {
+            // Focus moves on to the neighbour, so a run of d d d clears the Inbox.
             const neighbour = items[index + 1] ?? items[index - 1]
-            void api.patchMany([current.id], { archivedAt: current.archivedAt ? null : new Date().toISOString() }, current.archivedAt ? "restored" : "archived")
+            if (e.key === "d" && !current.archivedAt) void api.done([current.id])
+            else void api.toggleArchive(current)
             if (neighbour) setFocusId(neighbour.id)
           }
           break
@@ -55,8 +60,8 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
           if (api.state.selected.size) { e.preventDefault(); void api.remove([...api.state.selected]) }
           else if (current) { e.preventDefault(); void api.remove([current.id]) }
           break
-        case "g": api.dispatch({ type: "layout", layout: "grid" }); break
-        case "l": api.dispatch({ type: "layout", layout: "list" }); break
+        case "g": if (api.state.layout !== "grid") api.setLayout("grid"); break
+        case "l": if (api.state.layout !== "list") api.setLayout("list"); break
         case "a": case "A": if (e.shiftKey) { e.preventDefault(); api.dispatch({ type: "select", ids: items.map((b) => b.id), mode: "set" }) } break
         case "t": if (current) window.dispatchEvent(new CustomEvent("bookmark-ai:tag", { detail: current.id })); break
         case "Escape":

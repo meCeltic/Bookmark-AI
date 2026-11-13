@@ -62,11 +62,11 @@ export function ImportDialog({ open, onOpenChange }: Props) {
               onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
-              className={`flex w-full flex-col items-center justify-center gap-2 border border-dashed px-6 py-10 text-center transition-colors ${dragging ? "border-accent bg-accent-soft/30" : "border-border-strong hover:border-ink-2"}`}
+              className={`flex w-full flex-col items-center justify-center gap-2 rounded-card border border-dashed px-6 py-10 text-center transition-colors duration-[90ms] ${dragging ? "border-action bg-action-soft/40" : "border-line-strong hover:border-ink-3"}`}
             >
               <FileUp size={22} className="text-ink-2" />
               <span className="text-[14px]">Drop a bookmarks file here, or click to choose</span>
-              <span className="font-mono text-[11px] text-ink-3">.html from your browser, or a Bookmark-AI .json</span>
+              <span className="text-[13px] text-ink-3">An .html file from your browser, or a Bookmark-AI .json</span>
             </button>
           ) : (
             <div>
@@ -74,14 +74,14 @@ export function ImportDialog({ open, onOpenChange }: Props) {
                 Found <strong>{items.length}</strong> links in this {kind}
                 {folders ? <> across <strong>{folders}</strong> folders</> : null}. Links you already have will be skipped.
               </p>
-              <ul className="quiet-scroll mt-3 max-h-48 divide-y divide-border overflow-y-auto border border-border text-[13px]">
+              <ul className="quiet-scroll mt-3 max-h-48 divide-y divide-line overflow-y-auto rounded-card border border-line text-[13px]">
                 {items.slice(0, 50).map((i, n) => (
-                  <li key={n} className="flex items-center gap-2 px-3 py-1.5">
-                    <span className="truncate">{i.title}</span>
-                    {folderOf(i) ? <span className="ml-auto shrink-0 truncate font-mono text-[10.5px] text-ink-3">{folderOf(i)}</span> : null}
+                  <li key={n} className="flex min-w-0 items-center gap-2 px-3 py-1.5">
+                    <span className="min-w-0 truncate">{i.title}</span>
+                    {folderOf(i) ? <span className="ml-auto max-w-[40%] shrink-0 truncate text-[12px] text-ink-3">{folderOf(i)}</span> : null}
                   </li>
                 ))}
-                {items.length > 50 ? <li className="px-3 py-1.5 font-mono text-[11px] text-ink-3">…and {items.length - 50} more</li> : null}
+                {items.length > 50 ? <li className="px-3 py-1.5 text-[12px] text-ink-3">…and {items.length - 50} more</li> : null}
               </ul>
               <div className="mt-4 flex justify-end gap-2">
                 <button type="button" className="btn" onClick={() => setItems(null)}>Choose another file</button>

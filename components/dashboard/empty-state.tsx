@@ -10,11 +10,11 @@ export function EmptyDrawer() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center px-4 py-20 text-center">
       <Drawer />
-      <h2 className="mt-6 font-display text-[28px] font-medium">Nothing filed yet.</h2>
-      <p className="mt-2 text-ink-2">Paste any link in the bar above. The page gets read, summarised and tagged while you watch.</p>
+      <h2 className="mt-6 text-[22px] font-bold tracking-[-0.02em]">Nothing filed yet.</h2>
+      <p className="mt-2 text-ink-2">Paste any link into the search box. The page gets read, summarised and tagged while you watch.</p>
       <div className="mt-5 flex flex-wrap justify-center gap-2">
         {EXAMPLES.map((u) => (
-          <button key={u} type="button" className="stamp stamp-quiet h-6 px-2.5" onClick={() => api.addBookmark(u)}>{u}</button>
+          <button key={u} type="button" className="btn btn-sm font-mono text-[12px]" onClick={() => api.addBookmark(u)}>{u}</button>
         ))}
       </div>
     </div>
@@ -26,13 +26,13 @@ export function NoMatch({ query }: { query: string }) {
   const url = normalizeUrl(query)
   return (
     <div className="mx-auto max-w-md px-4 py-20 text-center">
-      <h2 className="font-display text-[22px] font-medium">
-        No card matches <em className="font-normal">“{query}”</em>.
+      <h2 className="text-[22px] font-bold tracking-[-0.02em]">
+        No card matches <span className="font-summary font-normal italic">“{query}”</span>.
       </h2>
       {url && /[.]/.test(query) && !/\s/.test(query) ? (
         <button type="button" className="btn btn-primary mt-4" onClick={() => api.addBookmark(query)}>Save it as a bookmark</button>
       ) : (
-        <p className="mt-2 text-ink-2">Try a different word, or clear the filters on the left.</p>
+        <p className="mt-2 text-ink-2">Try a different word, or clear the filters.</p>
       )}
     </div>
   )
@@ -42,7 +42,7 @@ export function EmptyView({ label }: { label: string }) {
   return (
     <div className="mx-auto max-w-md px-4 py-20 text-center">
       <Drawer small />
-      <h2 className="mt-4 font-display text-[22px] font-medium">{label}</h2>
+      <h2 className="mt-4 text-[17px] font-semibold">{label}</h2>
     </div>
   )
 }
