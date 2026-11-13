@@ -88,7 +88,7 @@ export default function Home() {
         <div className="flex flex-col gap-2 py-6 text-[13px] text-ink-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-6">
           <p>
             Next.js · Supabase Postgres (row-level security) · Gemini ·{" "}
-            <a href={`${REPO}#how-it-works`} className={`${link} whitespace-nowrap`}>How it works &rarr;</a> ·{" "}
+            <a href={`${REPO}#how-its-built`} className={`${link} whitespace-nowrap`}>How it works &rarr;</a> ·{" "}
             <a href={REPO} className={link}>Source</a>
           </p>
           <p>
