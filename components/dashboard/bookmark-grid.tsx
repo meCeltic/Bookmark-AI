@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChevronRight } from "lucide-react"
 import type { Bookmark } from "@/lib/domain/bookmark"
 import { canonicalKey, domainOf, normalizeUrl } from "@/lib/url/normalize"
@@ -30,6 +30,11 @@ export function BookmarkGrid() {
   const [rawFocusId, setFocusId] = useState<string | null>(null)
   const [flashId, setFlashId] = useState<string | null>(null)
   const { attach: attachKeyNav, isKeys } = useKeyNav<HTMLUListElement>()
+  const listRef = useRef<HTMLUListElement | null>(null)
+  const attachList = useCallback((el: HTMLUListElement | null) => {
+    listRef.current = el
+    attachKeyNav(el)
+  }, [attachKeyNav])
 
   // The Inbox is a to-read list: unread first (plus the ones read during this visit, which
   // stay put), then the rest folded into one line. Search ignores the fold.
@@ -39,6 +44,9 @@ export function BookmarkGrid() {
     const keep = (b: Bookmark) => b.readAt === null || state.held.has(b.id)
     return { toRead: visible.filter(keep), read: visible.filter((b) => !keep(b)) }
   }, [visible, inbox, state.held])
+  // One rule everywhere (header, fold, sidebar): a card opened during this visit counts as
+  // read even while it is held in place above the fold.
+  const readAll = useMemo(() => (inbox ? visible.filter((b) => b.readAt !== null) : []), [visible, inbox])
   const items: Bookmark[] = useMemo(() => {
     if (hits) return hits.map((h) => h.bookmark)
     return state.readOpen ? [...toRead, ...read] : toRead
@@ -62,7 +70,7 @@ export function BookmarkGrid() {
 
   const focusId = rawFocusId && items.some((b) => b.id === rawFocusId) ? rawFocusId : null
 
-  useKeyboard({ items, focusId, setFocusId })
+  useKeyboard({ items, focusId, setFocusId, list: listRef })
 
   const preview = (id: string) => {
     setFocusId(id)
@@ -75,10 +83,9 @@ export function BookmarkGrid() {
       const id = (e as CustomEvent<string>).detail
       const at = items.findIndex((b) => b.id === id)
       const next = items[at + 1] ?? items[at - 1]
-      if (at === -1 || !next) {
-        api.setPreview(null)
-        return
-      }
+      // No next card: leave the event uncancelled and the pane closes along with done.
+      if (at === -1 || !next) return
+      e.preventDefault()
       setFocusId(next.id)
       api.setPreview(next.id)
     }
@@ -153,11 +160,11 @@ export function BookmarkGrid() {
         aria-expanded={state.readOpen}
         onClick={() => api.setReadOpen(!state.readOpen)}
       >
-        {read.length} read
+        {readAll.length} read
         <ChevronRight size={14} aria-hidden className={cn("transition-transform duration-[140ms]", state.readOpen && "rotate-90")} />
       </button>
       <span aria-hidden>·</span>
-      <button type="button" className="h-7 hover:text-ink hover:underline" onClick={() => void api.done(read.map((b) => b.id))}>
+      <button type="button" className="h-7 hover:text-ink hover:underline" onClick={() => void api.done(readAll.map((b) => b.id))}>
         Mark all done
       </button>
       <span aria-hidden className="h-px flex-1 bg-line" />
@@ -166,10 +173,12 @@ export function BookmarkGrid() {
 
   return (
     <ul
-      ref={attachKeyNav}
+      ref={attachList}
+      tabIndex={-1}
+      aria-label="Links"
       className={cn(
         "cards min-w-0",
-        grid ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "-mx-2 flex max-w-[1040px] flex-col sm:-mx-3",
+        grid ? "grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" : "-mx-2 flex flex-col sm:-mx-3",
       )}
     >
       {inbox && toRead.length === 0 ? (
@@ -221,7 +230,7 @@ function SaveRow({ url }: { url: string }) {
   }
   const target = state.view.kind === "collection" ? (state.collections.find((c) => c.id === (state.view as { id: string }).id)?.name ?? "Inbox") : "Inbox"
   return (
-    <div className="-mx-2 max-w-[1040px] sm:-mx-3">
+    <div className="-mx-2 sm:-mx-3">
       <button
         type="submit"
         form="omnibox-form"

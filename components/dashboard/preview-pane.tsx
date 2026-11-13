@@ -37,7 +37,7 @@ export function PreviewPane() {
   const [starSeen, setStarSeen] = useState({ id: "", fav: false, pops: 0 })
   if (bookmark && (starSeen.id !== bookmark.id || starSeen.fav !== bookmark.favourite)) {
     const added = starSeen.id === bookmark.id && bookmark.favourite
-    setStarSeen({ id: bookmark.id, fav: bookmark.favourite, pops: added ? starSeen.pops + 1 : starSeen.pops })
+    setStarSeen({ id: bookmark.id, fav: bookmark.favourite, pops: added ? starSeen.pops + 1 : starSeen.id === bookmark.id ? starSeen.pops : 0 })
   }
   if (!bookmark) return null
   const starPop = starSeen.id === bookmark.id && starSeen.pops > 0 && bookmark.favourite
@@ -56,9 +56,11 @@ export function PreviewPane() {
       void api.toggleArchive(bookmark)
       return
     }
-    // Move along first, so the pane never shows a card that just left the list.
-    window.dispatchEvent(new CustomEvent("bookmark-ai:advance", { detail: bookmark.id }))
-    void api.done([bookmark.id])
+    // Move along first, so the pane never shows a card that just left the list. The list
+    // cancels the event when it moved on; otherwise this was the last card and the pane
+    // closes inside done's own view transition (two transitions would cut each other short).
+    const advanced = !window.dispatchEvent(new CustomEvent("bookmark-ai:advance", { detail: bookmark.id, cancelable: true }))
+    void api.done([bookmark.id], { closePreview: !advanced })
   }
 
   return (

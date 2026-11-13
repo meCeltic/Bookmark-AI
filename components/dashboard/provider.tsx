@@ -182,6 +182,8 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+type MoveOpts = { move?: boolean; closePreview?: boolean }
+
 export interface DashboardApi {
   mode: RepositoryMode
   state: State
@@ -202,11 +204,12 @@ export interface DashboardApi {
   reEnrich: (id: string) => Promise<void>
   patch: (id: string, patch: BookmarkPatch, opts?: { silent?: boolean }) => Promise<void>
   /** Apply one patch to many cards with an undo toast. `move` runs it as a view transition (cards leave the view). */
-  patchMany: (ids: string[], patch: BookmarkPatch, label: string, opts?: { move?: boolean }) => Promise<void>
+  patchMany: (ids: string[], patch: BookmarkPatch, label: string, opts?: MoveOpts) => Promise<void>
   /** Mark read and archive in one step. */
-  done: (ids: string[]) => Promise<void>
+  /** `closePreview`: the pane closes in the same view transition (Done on the last card). */
+  done: (ids: string[], opts?: { closePreview?: boolean }) => Promise<void>
   /** Move to Done without marking read, or restore to the Inbox. */
-  toggleArchive: (bookmark: Bookmark) => Promise<void>
+  toggleArchive: (bookmark: Bookmark, opts?: { closePreview?: boolean }) => Promise<void>
   /** Open a random unread card, weighted towards the oldest. */
   readSomething: () => void
   setLayout: (layout: Layout) => void
@@ -553,6 +556,11 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
       const applied = run(() => {
         dispatch({ type: "upsertMany", bookmarks: targets.map((b) => ({ ...b, ...p, updatedAt: stamp })) })
         dispatch({ type: "select", ids: [], mode: "set" })
+        // One transition for both: a second startViewTransition would cut the first short.
+        if (opts?.closePreview) {
+          latestPreview.current = null
+          dispatch({ type: "preview", id: null })
+        }
       })
       const result = await repo.updateBookmarks(targets.map((b) => b.id), p)
       await applied
@@ -573,17 +581,17 @@ export function DashboardProvider({ mode, repo, initial, seed, children }: Provi
   )
 
   const done = useCallback<DashboardApi["done"]>(
-    async (ids) => {
+    async (ids, opts) => {
       const stamp = new Date().toISOString()
       const one = ids.length === 1 ? state.bookmarks.find((b) => b.id === ids[0]) : undefined
-      await patchMany(ids, { readAt: one?.readAt ?? stamp, archivedAt: stamp }, "finished", { move: true })
+      await patchMany(ids, { readAt: one?.readAt ?? stamp, archivedAt: stamp }, "finished", { move: true, closePreview: opts?.closePreview })
     },
     [patchMany, state.bookmarks],
   )
 
   const toggleArchive = useCallback<DashboardApi["toggleArchive"]>(
-    async (b) => {
-      await patchMany([b.id], { archivedAt: b.archivedAt ? null : new Date().toISOString() }, b.archivedAt ? "restored" : "moved to Done", { move: true })
+    async (b, opts) => {
+      await patchMany([b.id], { archivedAt: b.archivedAt ? null : new Date().toISOString() }, b.archivedAt ? "restored" : "moved to Done", { move: true, closePreview: opts?.closePreview })
     },
     [patchMany],
   )

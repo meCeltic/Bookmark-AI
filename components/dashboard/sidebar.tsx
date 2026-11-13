@@ -55,12 +55,20 @@ function NavItem({ active, icon, label, count, onClick, tone }: { active: boolea
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex h-8 w-full min-w-0 items-center gap-2.5 rounded-[6px] px-2 text-left text-[14px] text-ink-2 transition-colors duration-[90ms] hover:bg-surface-2 hover:text-ink",
-        active && "font-semibold text-ink",
+        "flex h-8 w-full min-w-0 items-center gap-2.5 rounded-[6px] px-2 text-left text-[14px] text-ink-2 transition-colors duration-[90ms] hover:text-ink",
+        // The active item's mark is its only indicator: no hover fill (a pointer resting there
+        // after the click left a grey pill over the mark).
+        active ? "font-semibold text-ink" : "hover:bg-surface-2",
       )}
     >
       <span className={cn("shrink-0", active ? "text-ink" : "text-ink-3", tone === "danger" && "text-danger")}>{icon}</span>
-      <span className="isolate min-w-0 truncate">{active ? <Mark insetY=".22em" tilt="-1.5deg">{label}</Mark> : label}</span>
+      {/* The stroke runs a little past the letters top and bottom (inset -0.1em on a 1em line) and
+          .35em past each end; the padding lives inside the truncating span so nothing clips it. */}
+      <span className="isolate -mx-[0.35em] min-w-0 truncate px-[0.35em] py-[0.15em]">
+        {active ? (
+          <Mark insetY="-0.1em" tilt="-1.5deg" className="-mx-[0.25em] px-[0.25em] leading-none">{label}</Mark>
+        ) : label}
+      </span>
       {count !== undefined ? <Count value={count} className={cn(tone === "danger" && "text-danger")} /> : null}
     </button>
   )

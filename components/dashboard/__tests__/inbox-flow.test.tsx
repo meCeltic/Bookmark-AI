@@ -105,6 +105,9 @@ describe("Collection picker and tags", () => {
     const { container } = await mountWithRepo(<Probe />, [{ url: "https://x.example/", title: "X", tags: ["old"] }])
     await waitFor(() => expect(container.querySelector(".stamp-group")).not.toBeNull())
     expect(container.querySelector(".anim-stamp")).toBeNull()
+    // A dashed "+ tag" pill until clicked, then the input.
+    expect(screen.queryByLabelText("Add a tag")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "+ tag" }))
     const input = screen.getByLabelText("Add a tag")
     fireEvent.change(input, { target: { value: "mine" } })
     fireEvent.keyDown(input, { key: "Enter" })
@@ -117,3 +120,36 @@ describe("Collection picker and tags", () => {
     expect(container.querySelectorAll(".anim-stamp")).toHaveLength(1)
   })
 })
+
+describe("Counts and focus", () => {
+  const mixed = [
+    { url: "https://one.example/a", title: "Unread one", createdAt: day(1) },
+    { url: "https://two.example/b", title: "Unread two", createdAt: day(2) },
+    { url: "https://three.example/c", title: "Read before", readAt: day(1), createdAt: day(3) },
+  ]
+
+  it("a held card counts as read in the header, the fold and the sidebar alike", async () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null)
+    await mountWithRepo(<DashboardShell userLabel="Demo" cloudAvailable={false} />, mixed)
+    expect(screen.getByText("2 to read · 1 read")).toBeInTheDocument()
+    fireEvent.keyDown(document.body, { key: "j" })
+    fireEvent.keyDown(document.body, { key: "o" })
+    await waitFor(() => expect(screen.getByText("1 to read · 2 read")).toBeInTheDocument())
+    // Held in place above the fold, yet the fold counts it.
+    expect(screen.getByRole("link", { name: "Unread one" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /^2 read/ })).toBeInTheDocument()
+    const inbox = screen.getAllByRole("button", { name: /Inbox/ }).find((b) => b.getAttribute("aria-current") === "page")!
+    expect(inbox).toHaveTextContent("1")
+    open.mockRestore()
+  })
+
+  it("list keys take DOM focus from the sidebar, so only one indicator shows", async () => {
+    await mountWithRepo(<DashboardShell userLabel="Demo" cloudAvailable={false} />, mixed)
+    const navButton = screen.getAllByRole("button", { name: /Inbox/ })[0]!
+    act(() => { navButton.focus() })
+    expect(document.activeElement).toBe(navButton)
+    fireEvent.keyDown(navButton, { key: "j" })
+    expect(document.activeElement).toBe(screen.getByRole("list", { name: "Links" }))
+  })
+})
+

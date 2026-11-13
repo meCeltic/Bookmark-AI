@@ -191,8 +191,9 @@ export function TopBar({ onOpenMenu }: Props) {
                 <X size={14} />
               </button>
             ) : null}
+            {/* Wider screens save from the "Save … ↵" row under the field; the phone's bottom bar keeps a button. */}
             {looksLikeUrl ? (
-              <button type="submit" className="btn btn-primary btn-sm h-7 px-3 anim-pop" disabled={saving}>
+              <button type="submit" className="btn btn-primary btn-sm h-7 px-3 anim-pop sm:hidden" disabled={saving}>
                 {saving ? "Saving…" : "Save"}
               </button>
             ) : null}

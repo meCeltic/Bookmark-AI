@@ -619,7 +619,7 @@ mark {
 /* ---------------------------------------------------------- list columns */
 /* Unlayered: the row's grid and the omnibox's bare look must beat the layered defaults. */
 @media (min-width: 640px) {
-  .row-list { grid-template-columns: 16px minmax(0, 1fr) 11rem; }
+  .row-list { grid-template-columns: 16px minmax(0, 1fr) 12.5rem; }
   /* Desktop omnibox: no fill, the top bar's bottom rule is its underline. */
   .omni.field {
     height: 55px;
@@ -656,4 +656,10 @@ mark {
   .tag, .stamp, .stamp-x { height: 28px; font-size: 14px; }
   .btn-icon.h-7, .btn-icon.h-6 { width: 36px !important; height: 36px !important; }
   .btn-sm { height: 36px; }
+}
+
+/* The list takes DOM focus on j/k/d…; its lit row is the indicator, not an outline. */
+.cards:focus,
+.cards:focus-visible {
+  outline: none;
 }

@@ -82,4 +82,27 @@ describe("PreviewPane", () => {
     expect(pane()).toBeNull()
     await waitFor(async () => expect((await repo.listBookmarks()).find((b) => b.title === "Second card")!.readAt).not.toBeNull())
   })
+
+  it("the star pops when added, and a different card starts with no pop", async () => {
+    await mount()
+    fireEvent.click(rowOf("First card"))
+    fireEvent.click(within(pane()!).getByRole("button", { name: /Star/ }))
+    await waitFor(() => expect(pane()!.querySelector(".anim-star")).not.toBeNull())
+    fireEvent.keyDown(document.body, { key: "j" })
+    expect(within(pane()!).getByRole("link", { name: "Second card" })).toBeInTheDocument()
+    fireEvent.click(within(pane()!).getByRole("button", { name: /Star/ }))
+    await waitFor(() => expect(within(pane()!).getByRole("button", { name: /Starred/ })).toBeInTheDocument())
+    // Back on the first (already starred) card: no pop on arrival.
+    fireEvent.keyDown(document.body, { key: "k" })
+    expect(within(pane()!).getByRole("link", { name: "First card" })).toBeInTheDocument()
+    expect(pane()!.querySelector(".anim-star")).toBeNull()
+  })
+
+  it("Done on the last card closes the pane along with the done", async () => {
+    const { repo } = await mountWithRepo(<><BookmarkGrid /><PreviewPane /></>, seed.slice(0, 1))
+    fireEvent.click(rowOf("First card"))
+    fireEvent.click(within(pane()!).getByRole("button", { name: /^Done/ }))
+    await waitFor(() => expect(pane()).toBeNull())
+    await waitFor(async () => expect((await repo.listBookmarks())[0]!.archivedAt).not.toBeNull())
+  })
 })

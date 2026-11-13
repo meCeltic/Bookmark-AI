@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { ArrowRight, MoreHorizontal, Pencil, Trash2, X } from "lucide-react"
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@/components/ui/menu"
+import { cn } from "@/lib/utils"
 import { useDashboard } from "./provider"
 import { Sidebar } from "./sidebar"
 import { TopBar } from "./topbar"
@@ -99,6 +100,8 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
         <TopBar onOpenPalette={() => setPalette(true)} onOpenMenu={() => setDrawer(true)} />
         <div className="flex min-h-0 min-w-0 flex-1">
           <main className="quiet-scroll min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-24">
+            {/* The list keeps a reading measure: at most 1100px, centred in whatever room the pane leaves. */}
+            <div className={cn("mx-auto w-full min-w-0", (state.layout === "list" || state.omniUrl) && "max-w-[1100px]")}>
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
               <h1 className="min-w-0 truncate text-[22px] font-bold tracking-[-0.02em]">{heading}</h1>
               {state.omniUrl ? null : <span className="text-[13px] tabular-nums text-ink-3">{summary}</span>}
@@ -120,6 +123,7 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
             ) : null}
             <div className="mt-4">
               <BookmarkGrid />
+            </div>
             </div>
           </main>
           <PreviewPane />

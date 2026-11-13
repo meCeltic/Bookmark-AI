@@ -9,7 +9,12 @@ interface Options {
   items: Bookmark[]
   focusId: string | null
   setFocusId: (id: string | null) => void
+  /** The list element: list keys move DOM focus here, so no other control keeps a ring. */
+  list?: { current: HTMLElement | null }
 }
+
+/** Keys that drive the list. Pressing one hands DOM focus to the list. */
+const LIST_KEYS = new Set(["j", "k", "ArrowDown", "ArrowUp", "d", "e", "o", "u", "f", "r", "x"])
 
 /**
  * j/k move (and carry the preview pane along), enter or o opens, f star, r read, d done (read + archive), e archive,
@@ -17,7 +22,7 @@ interface Options {
  * shift+R read something, x select, c copy, backspace delete, g/l layout,
  * escape closes the pane, then clears. Ignored while typing.
  */
-export function useKeyboard({ items, focusId, setFocusId }: Options) {
+export function useKeyboard({ items, focusId, setFocusId, list }: Options) {
   const api = useDashboard()
 
   useEffect(() => {
@@ -27,6 +32,11 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return
       // Enter on a link or button is that element's own click; do not open a second tab.
       if (e.key === "Enter" && target && (target.tagName === "A" || target.tagName === "BUTTON")) return
+
+      // One focus indicator at a time: a sidebar button or a row link that kept focus from a
+      // click or Tab gives it up to the list, whose lit row is then the only mark.
+      const listEl = list?.current
+      if (listEl && LIST_KEYS.has(e.key) && document.activeElement !== listEl) listEl.focus({ preventScroll: true })
 
       const index = items.findIndex((b) => b.id === focusId)
       const current = index >= 0 ? items[index] : undefined
@@ -57,18 +67,18 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
           if (current) {
             // Focus moves on to the neighbour, so a run of d d d clears the Inbox.
             const neighbour = items[index + 1] ?? items[index - 1]
-            if (e.key === "d" && !current.archivedAt) void api.done([current.id])
-            else void api.toggleArchive(current)
+            // The last card: the pane closes inside the same transition.
+            const closePreview = !neighbour && previewing
+            if (e.key === "d" && !current.archivedAt) void api.done([current.id], { closePreview })
+            else void api.toggleArchive(current, { closePreview })
             if (neighbour) focusOn(neighbour.id)
-            else if (previewing) api.setPreview(null)
           }
           break
         case "u":
           if (current?.archivedAt) {
             const neighbour = items[index + 1] ?? items[index - 1]
-            void api.toggleArchive(current)
+            void api.toggleArchive(current, { closePreview: !neighbour && previewing })
             if (neighbour) focusOn(neighbour.id)
-            else if (previewing) api.setPreview(null)
           }
           break
         case "x": if (current) api.dispatch({ type: "select", ids: [current.id], mode: "toggle" }); break
@@ -91,5 +101,5 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [api, items, focusId, setFocusId])
+  }, [api, items, focusId, setFocusId, list])
 }

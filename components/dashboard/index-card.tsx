@@ -352,7 +352,7 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
         {/* Wide: a fixed column for domain · age; hover swaps it for the actions, so nothing covers the summary. */}
         <div className="row-slot max-sm:hidden">
           {/* The domain gives way before the age does. */}
-          <span className="row-meta flex min-w-0 text-[13px] text-ink-3"><span className="min-w-0 truncate">{domain}</span><span className="shrink-0 whitespace-pre"> · {age}</span></span>
+          <span className="row-meta flex min-w-0 text-[13px] text-ink-3" title={domain}><span className="min-w-0 truncate">{slotHost(domain)}</span><span className="shrink-0 whitespace-pre"> · {age}</span></span>
           {actions}
         </div>
         {touchMore}
@@ -384,7 +384,7 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
         {touchMore}
       </header>
 
-      <h3 className={cn("mt-2 line-clamp-2 text-[17px] leading-snug tracking-[-0.01em]", unread ? "font-bold" : "font-semibold", pending && !bookmark.summary && "text-ink-2")}>
+      <h3 className={cn("mt-2 line-clamp-2 text-[17px] leading-snug tracking-[-0.01em]", unread ? "font-bold" : "font-normal", pending && !bookmark.summary && "text-ink-2")}>
         {titleLink("outline-none hover:underline")}
       </h3>
 
@@ -397,4 +397,16 @@ export function IndexCard({ bookmark, layout, index = 0, focused, pending, selec
       {bookmark.tags.length || tagDraft !== null ? <div className="mt-3">{tags}</div> : null}
     </li>
   )
+}
+
+/**
+ * The right slot's host: whole when it fits (joelonsoftware.com), otherwise the subdomain part
+ * gives way first (cheatsheetseries.owasp.org → owasp.org); the registrable name never truncates.
+ */
+export function slotHost(host: string, max = 22): string {
+  if (host.length <= max) return host
+  const labels = host.split(".")
+  // Keep a two-letter second level with its country (bbc.co.uk), else the last two labels.
+  const keep = labels.length > 2 && labels.at(-2)!.length <= 3 && labels.at(-1)!.length === 2 ? 3 : 2
+  return labels.length > keep ? labels.slice(-keep).join(".") : host
 }
