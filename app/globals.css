@@ -94,7 +94,6 @@ html {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-variant-numeric: tabular-nums;
 }
 
 body {
@@ -112,14 +111,17 @@ body {
   border-radius: 4px;
 }
 
-h1, h2, h3 {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  text-wrap: balance;
+@layer base {
+  h1, h2, h3 {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+  a { text-underline-offset: 3px; }
+  /* Schibsted's tabular figures also widen punctuation, so counts opt in. */
+  .tabular { font-variant-numeric: tabular-nums; }
 }
-
-a { text-underline-offset: 3px; }
 
 /* Native <mark> is the highlighter too, for search hits inside text. */
 mark {
