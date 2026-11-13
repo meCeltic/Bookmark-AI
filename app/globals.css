@@ -14,6 +14,7 @@
   --ink-3: #8a8d95;
   --mark: #ffd84a;
   --mark-soft: #fff3bf;
+  --mark-ink: #111216;
   --action: #1e3bd1;
   --action-ink: #ffffff;
   --action-soft: #e8ecfb;
@@ -28,16 +29,17 @@
   --bg: #0e0f11;
   --surface: #16171a;
   --surface-2: #1d1f23;
-  --line: #2a2c31;
-  --line-strong: #3b3e45;
+  --line: #2f3238;
+  --line-strong: #41454d;
   --ink: #f3f2ed;
   --ink-2: #a2a5ad;
-  --ink-3: #6e717a;
+  --ink-3: #7c808a;
   --mark: #f5cf3a;
   --mark-soft: #3d3514;
-  --action: #8ea2ff;
-  --action-ink: #0e0f11;
-  --action-soft: #1d2440;
+  --mark-ink: #111216;
+  --action: #5b74ff;
+  --action-ink: #ffffff;
+  --action-soft: #1f2a5c;
   --danger: #ff7a66;
   --ok: #5bc48a;
   --shadow-pop: 0 8px 30px -12px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -132,7 +134,7 @@ body {
 /* Native <mark> is the highlighter too, for search hits inside text. */
 mark {
   background: var(--mark);
-  color: var(--ink);
+  color: var(--mark-ink);
   padding: 0 0.08em;
   margin: 0 -0.08em;
   border-radius: 2px;
