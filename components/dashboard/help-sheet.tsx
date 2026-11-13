@@ -6,7 +6,7 @@ const ROWS: Array<[string, string]> = [
   ["/", "Focus search"],
   ["⌘K", "Command palette"],
   ["j / k", "Next / previous card"],
-  ["click", "Preview card"],
+  ["click", "Open link in a new tab"],
   ["↵ / o", "Open link"],
   ["space", "Preview details"],
   ["esc", "Close preview"],
