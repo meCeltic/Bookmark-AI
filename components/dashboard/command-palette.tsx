@@ -1,7 +1,7 @@
 "use client"
 
 import { Command } from "cmdk"
-import { Archive, ArrowDownUp, Dices, RotateCcw, Download, ExternalLink, Folder, FolderPlus, HeartPulse, Inbox, LayoutGrid, Moon, Plus, Rows3, Settings, Star, Sun, Upload, Keyboard, Tag } from "lucide-react"
+import { CheckCheck, ArrowDownUp, Dices, RotateCcw, Download, ExternalLink, Folder, FolderPlus, HeartPulse, Inbox, LayoutGrid, Moon, Plus, Rows3, Settings, Star, Sun, Upload, Keyboard, Tag } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useRouter } from "next/navigation"
 import { switchTheme } from "@/components/theme-toggle"
@@ -102,7 +102,7 @@ export function CommandPalette({ open, onOpenChange, onImport, onExport, onHelp 
                 <Command.Group heading={<Heading>Go to</Heading>}>
                   <Item onSelect={go({ kind: "view", view: "all" })}><Inbox size={14} /> Inbox</Item>
                   <Item onSelect={go({ kind: "view", view: "favourites" })}><Star size={14} /> Starred</Item>
-                  <Item onSelect={go({ kind: "view", view: "archive" })}><Archive size={14} /> Archive</Item>
+                  <Item value="done archive" onSelect={go({ kind: "view", view: "archive" })}><CheckCheck size={14} /> Done</Item>
                   {state.collections.map((c) => (
                     <Item key={c.id} value={`collection ${c.name}`} onSelect={go({ kind: "collection", id: c.id })}>
                       <Folder size={14} className="text-ink-3" /> {c.name}

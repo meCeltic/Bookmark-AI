@@ -12,9 +12,9 @@ interface Options {
 }
 
 /**
- * j/k move, enter opens, f star, r read, d done (read + archive), e archive,
+ * j/k move (and carry the preview pane along), enter or o opens, f star, r read, d done (read + archive), e archive,
  * shift+R read something, x select, c copy, backspace delete, g/l layout,
- * escape clears. Ignored while typing.
+ * escape closes the pane, then clears. Ignored while typing.
  */
 export function useKeyboard({ items, focusId, setFocusId }: Options) {
   const api = useDashboard()
@@ -22,15 +22,22 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
-      const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable || target.getAttribute("role") === "menuitem")
+      const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable || target.getAttribute("role") === "menuitem")
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return
+      // Enter on a link or button is that element's own click; do not open a second tab.
+      if (e.key === "Enter" && target && (target.tagName === "A" || target.tagName === "BUTTON")) return
 
       const index = items.findIndex((b) => b.id === focusId)
       const current = index >= 0 ? items[index] : undefined
+      const previewing = api.state.preview !== null
+      const focusOn = (id: string) => {
+        setFocusId(id)
+        if (previewing) api.dispatch({ type: "preview", id })
+      }
       const move = (delta: number) => {
         const next = items[Math.max(0, Math.min(items.length - 1, index + delta))]
         if (next) {
-          setFocusId(next.id)
+          focusOn(next.id)
           const el = document.querySelector<HTMLElement>(`[data-id="${next.id}"]`)
           if (el) el.scrollIntoView({ block: "nearest" })
           else window.dispatchEvent(new CustomEvent("bookmark-ai:reveal", { detail: { id: next.id } }))
@@ -40,7 +47,7 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
       switch (e.key) {
         case "j": case "ArrowDown": e.preventDefault(); move(1); break
         case "k": case "ArrowUp": e.preventDefault(); move(-1); break
-        case "Enter": if (current) { e.preventDefault(); api.open(current) } break
+        case "Enter": case "o": if (current) { e.preventDefault(); api.open(current) } break
         case "f": if (current) void api.patch(current.id, { favourite: !current.favourite }); break
         case "r": if (current) void api.patch(current.id, { readAt: current.readAt ? null : new Date().toISOString() }); break
         case "R": e.preventDefault(); api.readSomething(); break
@@ -51,7 +58,8 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
             const neighbour = items[index + 1] ?? items[index - 1]
             if (e.key === "d" && !current.archivedAt) void api.done([current.id])
             else void api.toggleArchive(current)
-            if (neighbour) setFocusId(neighbour.id)
+            if (neighbour) focusOn(neighbour.id)
+            else if (previewing) api.dispatch({ type: "preview", id: null })
           }
           break
         case "x": if (current) api.dispatch({ type: "select", ids: [current.id], mode: "toggle" }); break
@@ -65,7 +73,8 @@ export function useKeyboard({ items, focusId, setFocusId }: Options) {
         case "a": case "A": if (e.shiftKey) { e.preventDefault(); api.dispatch({ type: "select", ids: items.map((b) => b.id), mode: "set" }) } break
         case "t": if (current) window.dispatchEvent(new CustomEvent("bookmark-ai:tag", { detail: current.id })); break
         case "Escape":
-          if (api.state.selected.size) api.dispatch({ type: "select", ids: [], mode: "set" })
+          if (previewing) api.dispatch({ type: "preview", id: null })
+          else if (api.state.selected.size) api.dispatch({ type: "select", ids: [], mode: "set" })
           else setFocusId(null)
           break
         case "?": e.preventDefault(); window.dispatchEvent(new CustomEvent("bookmark-ai:help")); break

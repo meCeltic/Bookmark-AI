@@ -43,6 +43,8 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const listId = useId()
   const mounted = useMounted()
+  // Keyboards only: phones get no shortcut in the placeholder.
+  const hintKey = mounted && typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches ? (isMac() ? "⌘K" : "Ctrl K") : ""
   const looksLikeUrl = draft.trim().length > 3 && normalizeUrl(draft.trim()) !== null && /[.:]/.test(draft) && !/\s/.test(draft.trim())
 
   // /save?url=… lands here as ?save=…; prefill it once, in Save mode.
@@ -151,7 +153,7 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
 
       {/* Phones: a bar fixed to the bottom, above the home indicator. Wider: inline in the header. */}
       <form
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:static sm:z-auto sm:min-w-0 sm:max-w-[640px] sm:flex-1 sm:border-0 sm:bg-transparent sm:p-0"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 sm:static sm:z-auto sm:min-w-0 sm:max-w-[720px] sm:flex-1 sm:border-0 sm:bg-transparent sm:p-0"
         onSubmit={(e) => { e.preventDefault(); void save() }}
         role="search"
       >
@@ -160,8 +162,9 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
           <input
             ref={inputRef}
             id="omnibox"
-            className={cn("field pl-9 text-[15px]", looksLikeUrl ? "pr-24" : "pr-16")}
-            placeholder="Search, #tag, or paste a link"
+            className={cn("field pl-9 text-[15px]", looksLikeUrl ? "pr-24" : draft ? "pr-10" : "pr-3")}
+            // The shortcut rides in the placeholder while the box is idle; no chip.
+            placeholder={`Search, #tag, or paste a link${!focused && hintKey ? `  ${hintKey}` : ""}`}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={onKeyDown}
@@ -184,13 +187,9 @@ export function TopBar({ onOpenPalette, onOpenMenu }: Props) {
               <button type="button" className="btn btn-ghost btn-icon h-7 w-7" aria-label="Clear" onClick={() => { setDraft(""); inputRef.current?.focus() }}>
                 <X size={14} />
               </button>
-            ) : (
-              <button type="button" onClick={onOpenPalette} className="hidden items-center pr-1 sm:flex" aria-label="Open command palette" tabIndex={-1}>
-                <span className="kbd">{mounted && isMac() ? "⌘K" : "Ctrl K"}</span>
-              </button>
-            )}
+            ) : null}
             {looksLikeUrl ? (
-              <button type="submit" className="btn btn-primary btn-sm h-7 anim-pop" disabled={saving}>
+              <button type="submit" className="btn btn-primary btn-sm h-7 px-3 anim-pop" disabled={saving}>
                 {saving ? "Saving…" : "Save"}
               </button>
             ) : null}

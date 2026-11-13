@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { MoreHorizontal, Pencil, Trash2, X } from "lucide-react"
 import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@/components/ui/menu"
@@ -13,8 +13,9 @@ import { ImportDialog } from "./import-dialog"
 import { ExportDialog } from "./export-dialog"
 import { BulkBar } from "./bulk-bar"
 import { HelpSheet } from "./help-sheet"
-import { DemoBanner } from "./demo-banner"
 import { SaveToast } from "./save-toast"
+import { PreviewPane } from "./preview-pane"
+import { readFlag } from "@/lib/client/prefs"
 
 interface Props {
   userLabel: string
@@ -22,7 +23,16 @@ interface Props {
   onSignOut?: () => void
 }
 
-const VIEW_HEADING = { all: "Inbox", favourites: "Starred", archive: "Archive" } as const
+const VIEW_HEADING = { all: "Inbox", favourites: "Starred", archive: "Done" } as const
+
+// "Has this browser ever saved a link?" Read after mount; flips on the first save.
+const subscribeFlag = (cb: () => void) => {
+  window.addEventListener("bookmark-ai:flag", cb)
+  return () => window.removeEventListener("bookmark-ai:flag", cb)
+}
+const readSavedOnce = () => readFlag("saved-once")
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) {
   const api = useDashboard()
@@ -46,19 +56,31 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
       ? (state.collections.find((c) => c.id === view.id)?.name ?? "Collection")
       : VIEW_HEADING[view.view]
 
+  const savedOnce = useSyncExternalStore(subscribeFlag, readSavedOnce, () => true)
+
   const shown = api.hits ? api.hits.length : api.visible.length
-  const unreadHere = api.hits ? 0 : api.visible.filter((b) => b.readAt === null && !b.archivedAt).length
+  const unreadHere = api.visible.filter((b) => b.readAt === null && !b.archivedAt).length
+  const inInbox = view.kind === "view" && view.view === "all" && !state.healthFilter
+  const summary = api.hits
+    ? plural(shown, "match", "matches")
+    : inInbox
+      ? `${unreadHere} to read · ${shown - unreadHere} read`
+      : view.kind === "view" && view.view === "archive"
+        ? `${shown} done`
+        : view.kind === "view" && view.view === "favourites"
+          ? `${shown} starred`
+          : plural(shown, "link", "links")
 
   return (
     <div className="flex h-dvh min-w-0 overflow-hidden">
-      <Sidebar className="hidden lg:flex" userLabel={userLabel} onImport={() => setImporting(true)} onExport={() => setExporting(true)} onSignOut={onSignOut} />
+      <Sidebar className="hidden lg:flex" userLabel={userLabel} cloudAvailable={cloudAvailable} onImport={() => setImporting(true)} onExport={() => setExporting(true)} onSignOut={onSignOut} />
 
       <DialogPrimitive.Root open={drawer} onOpenChange={setDrawer}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Overlay className="fade-anim fixed inset-0 z-40 bg-ink/30 lg:hidden dark:bg-black/60" />
           <DialogPrimitive.Content className="fade-anim fixed inset-y-0 left-0 z-50 flex max-w-[calc(100vw-48px)] outline-none lg:hidden">
             <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
-            <Sidebar userLabel={userLabel} onImport={() => { setDrawer(false); setImporting(true) }} onExport={() => { setDrawer(false); setExporting(true) }} onSignOut={onSignOut} onNavigate={() => setDrawer(false)} />
+            <Sidebar userLabel={userLabel} cloudAvailable={cloudAvailable} onImport={() => { setDrawer(false); setImporting(true) }} onExport={() => { setDrawer(false); setExporting(true) }} onSignOut={onSignOut} onNavigate={() => setDrawer(false)} />
             <DialogPrimitive.Close className="btn btn-icon m-2 h-9 w-9 self-start" aria-label="Close menu"><X size={16} /></DialogPrimitive.Close>
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
@@ -66,29 +88,29 @@ export function DashboardShell({ userLabel, cloudAvailable, onSignOut }: Props) 
 
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar onOpenPalette={() => setPalette(true)} onOpenMenu={() => setDrawer(true)} />
-        {api.mode === "demo" ? <DemoBanner cloudAvailable={cloudAvailable} /> : null}
-
-        <main className="quiet-scroll min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-24">
-          <div className="mb-4 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h1 className="min-w-0 truncate text-[22px] font-bold tracking-[-0.02em]">{heading}</h1>
-            <span className="text-[13px] text-ink-3">
-              {api.hits
-                ? `${shown} ${shown === 1 ? "match" : "matches"}`
-                : `${shown} ${shown === 1 ? "card" : "cards"}${unreadHere && view.kind === "view" && view.view === "all" ? `, ${unreadHere} unread` : ""}`}
-            </span>
-            {state.tags.length ? (
-              <span className="flex min-w-0 flex-wrap items-center gap-x-2">
-                {state.tags.map((t) => <ActiveTag key={t} tag={t} />)}
-              </span>
-            ) : null}
-            {state.healthFilter ? (
-              <button type="button" className="btn btn-ghost btn-sm h-6 px-1.5 text-[13px]" onClick={() => api.dispatch({ type: "healthFilter", value: null })}>
-                Show all <X size={12} />
-              </button>
-            ) : null}
-          </div>
-          <BookmarkGrid />
-        </main>
+        <div className="flex min-h-0 min-w-0 flex-1">
+          <main className="quiet-scroll min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-24">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 className="min-w-0 truncate text-[22px] font-bold tracking-[-0.02em]">{heading}</h1>
+              <span className="text-[13px] tabular-nums text-ink-3">{summary}</span>
+              {state.tags.length ? (
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2">
+                  {state.tags.map((t) => <ActiveTag key={t} tag={t} />)}
+                </span>
+              ) : null}
+              {state.healthFilter ? (
+                <button type="button" className="btn btn-ghost btn-sm h-6 px-1.5 text-[13px]" onClick={() => api.dispatch({ type: "healthFilter", value: null })}>
+                  Show all <X size={12} />
+                </button>
+              ) : null}
+            </div>
+            {savedOnce || !inInbox || api.hits ? null : <p className="mt-1 text-[13px] text-ink-3">Paste any link in the search box to save it</p>}
+            <div className="mt-4">
+              <BookmarkGrid />
+            </div>
+          </main>
+          <PreviewPane />
+        </div>
       </div>
 
       <BulkBar onExport={() => setExporting(true)} />

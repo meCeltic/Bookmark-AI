@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, Download, FolderPlus, HeartPulse, Inbox, LogOut, MoreHorizontal, Pencil, RotateCcw, Settings, Star, Trash2, Upload } from "lucide-react"
+import { CheckCheck, Download, FolderPlus, HeartPulse, Inbox, LogOut, MoreHorizontal, Pencil, RotateCcw, Settings, Star, Trash2, Upload } from "lucide-react"
 import Link from "next/link"
 import { useState, type ReactNode } from "react"
 import type { SystemView, ViewSelection } from "@/lib/domain/bookmark"
@@ -13,11 +13,13 @@ import { useDashboard } from "./provider"
 const VIEWS: Array<{ view: SystemView; label: string; icon: ReactNode }> = [
   { view: "all", label: "Inbox", icon: <Inbox size={15} /> },
   { view: "favourites", label: "Starred", icon: <Star size={15} /> },
-  { view: "archive", label: "Archive", icon: <Archive size={15} /> },
+  { view: "archive", label: "Done", icon: <CheckCheck size={15} /> },
 ]
 
 interface Props {
   userLabel: string
+  /** Demo only: whether "Sign up to sync" can lead anywhere. */
+  cloudAvailable?: boolean
   onImport: () => void
   onExport: () => void
   onSignOut?: () => void
@@ -64,7 +66,7 @@ function NavItem({ active, icon, label, count, onClick, tone }: { active: boolea
   )
 }
 
-export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, onNavigate }: Props) {
+export function Sidebar({ userLabel, cloudAvailable = false, onImport, onExport, onSignOut, className, onNavigate }: Props) {
   const api = useDashboard()
   const { state, counts } = api
   const [newName, setNewName] = useState<string | null>(null)
@@ -81,11 +83,12 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
 
   return (
     <aside className={cn("quiet-scroll flex h-full w-[208px] shrink-0 flex-col overflow-y-auto border-r border-line bg-bg", className)}>
-      <div className="px-4 pb-4 pt-4">
+      {/* 56px, one line: matches the top bar so both borders meet. */}
+      <div className="flex h-14 shrink-0 items-center border-b border-line px-4">
         <Wordmark href={api.mode === "demo" ? "/" : "/dashboard"} />
       </div>
 
-      <nav className="flex flex-col gap-px px-2" aria-label="Views">
+      <nav className="mt-3 flex flex-col gap-px px-2" aria-label="Views">
         {VIEWS.map(({ view, label, icon }) => (
           <NavItem
             key={view}
@@ -189,7 +192,18 @@ export function Sidebar({ userLabel, onImport, onExport, onSignOut, className, o
         ) : null}
       </div>
 
-      <div className="mt-auto flex min-w-0 items-center gap-1 px-2 pb-3 pt-6">
+      {api.mode === "demo" ? (
+        <p className="mt-auto px-4 pt-6 text-[13px] leading-snug text-ink-3">
+          Demo · stays in this browser
+          {cloudAvailable ? (
+            <>
+              <br />
+              <Link href="/signup" className="font-medium text-action underline-offset-2 hover:underline" onClick={onNavigate}>Sign up to sync</Link>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+      <div className={cn("flex min-w-0 items-center gap-1 px-2 pb-3", api.mode === "demo" ? "pt-2" : "mt-auto pt-6")}>
         <MenuRoot>
           <MenuTrigger asChild>
             <button type="button" className="btn btn-ghost btn-sm min-w-0 flex-1 justify-start gap-2 px-2 text-ink-2" aria-label="More">

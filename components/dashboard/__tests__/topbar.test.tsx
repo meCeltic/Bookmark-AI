@@ -24,6 +24,17 @@ describe("TopBar", () => {
     expect(screen.queryByRole("button", { name: /Save/ })).toBeNull()
   })
 
+  it("has no shortcut chip; a pasted link shows a primary Save button inside the field", async () => {
+    await mountWithRepo(<TopBar onOpenPalette={() => {}} onOpenMenu={() => {}} />)
+    expect(screen.queryByRole("button", { name: "Open command palette" })).toBeNull()
+    const box = screen.getByLabelText("Search or paste a link")
+    expect(box.getAttribute("placeholder")).toMatch(/^Search, #tag, or paste a link/)
+    fireEvent.change(box, { target: { value: "https://example.com/a" } })
+    const save = screen.getByRole("button", { name: "Save" })
+    expect(save).toHaveClass("btn-primary")
+    expect(box.parentElement!.contains(save)).toBe(true)
+  })
+
   it("focuses the input when / is pressed outside a field", async () => {
     await mountWithRepo(<TopBar onOpenPalette={() => {}} onOpenMenu={() => {}} />)
     const box = screen.getByLabelText("Search or paste a link")
