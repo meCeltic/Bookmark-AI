@@ -11,7 +11,8 @@ const link = "underline decoration-line-strong underline-offset-4 hover:text-act
 
 export default function Home() {
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[1120px] flex-col overflow-x-clip px-4 sm:px-8">
+    <div className="overflow-x-clip">
+      <div className="mx-auto w-full max-w-[1120px] px-4 sm:px-8">
       <header className="flex h-16 items-center justify-between gap-4">
         <Wordmark />
         <nav className="flex items-center gap-4 text-[14px] font-medium text-ink-2 sm:gap-5">
@@ -21,14 +22,14 @@ export default function Home() {
         </nav>
       </header>
 
-      <main className="flex-1">
+      <main>
         <section className="pb-16 pt-14 sm:pb-20 sm:pt-24">
           {/* Inline weight/tracking: the unlayered h1 rule in globals.css would beat utility classes. */}
           <h1
-            className="isolate max-w-[11ch] text-[clamp(56px,8.5vw,132px)] leading-[0.92]"
+            className="isolate max-w-[12ch] text-[clamp(56px,8.5vw,132px)] leading-[0.92]"
             style={{ fontWeight: 900, letterSpacing: "-0.04em" }}
           >
-            Save it now. Find it with <Mark animate className="ml-[0.08em]">one word</Mark>.
+            Save it now. Find it with <Mark animate>one word</Mark>.
           </h1>
           <p className="mt-6 max-w-[46ch] text-[16px] leading-relaxed text-ink-2 sm:text-[17px]">
             Paste a link and Bookmark-AI writes the summary and tags, so the page is there when you need it again.
@@ -42,7 +43,7 @@ export default function Home() {
         </section>
 
         <section className="border-t border-line py-14 sm:py-20" aria-labelledby="find-heading">
-          <h2 id="find-heading" className="text-[22px] font-bold">Find it again</h2>
+          <h2 id="find-heading" className="text-[32px] font-extrabold tracking-[-0.03em]">Find it again</h2>
           <p className="mt-2 max-w-[52ch] text-[15px] text-ink-2">Months later, one word you remember is enough.</p>
           <div className="mt-8">
             <FindStrip />
@@ -50,14 +51,32 @@ export default function Home() {
         </section>
 
         <section className="border-t border-line py-14 sm:py-20">
-          <p className="max-w-[60ch] text-[22px] font-medium leading-snug">
-            Every link you save gets a two-line summary and tags written for you, one search box that finds it by any
-            word you remember, collections to group it, and an export whenever you want to take it all with you.
+          <p className="max-w-[34ch] font-summary text-[24px] italic leading-snug text-ink-2 sm:text-[28px]">
+            You&rsquo;ll forget why you saved it. It won&rsquo;t.
+          </p>
+          <p className="mt-4 text-[13px] text-ink-3">
+            Summary and tags on save · search by any word · collections · import and export
           </p>
         </section>
       </main>
+      </div>
 
-      <footer className="flex flex-col gap-2 border-t border-line py-6 text-[13px] text-ink-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-6">
+      <section className="bg-mark py-24 text-[#111216]" aria-labelledby="close-heading">
+        <div className="mx-auto w-full max-w-[1120px] px-4 sm:px-8">
+          <h2
+            id="close-heading"
+            className="text-[clamp(40px,5vw,72px)] leading-[0.95] text-[#111216]"
+            style={{ fontWeight: 900, letterSpacing: "-0.04em" }}
+          >
+            Paste your first link.
+          </h2>
+          <div className="mt-8">
+            <TrySave id="try-url-close" onMark />
+          </div>
+        </div>
+      </section>
+
+      <footer className="mx-auto flex w-full max-w-[1120px] flex-col gap-2 px-4 py-6 sm:px-8 text-[13px] text-ink-3 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-6">
         <p>
           Next.js · Supabase Postgres (row-level security) · Gemini ·{" "}
           <a href={`${REPO}#how-it-works`} className={`${link} whitespace-nowrap`}>How it works &rarr;</a> ·{" "}
